@@ -1,4 +1,5 @@
 from math import ceil
+from socket import timeout
 
 from connections_manager import ConnectionsManager
 from multiprocessing.pool import ThreadPool
@@ -21,7 +22,42 @@ class Vault:
         if any(c in key for c in ILLEGAL_CHARS):
             raise ValueError("key contains illegal characters")
 
-    def get(self, key: str) -> tuple[bool, str]:
+    def set_leader_addr(self, leader_addr):
+        self.leader_addr = leader_addr
+
+    def slave_listen(self):
+        while True:
+            # Necesitamos un timeout para que cada tanto salga del recv_from y pueda cambiar de leader
+            message = self.cluster.recv_from(self.leader_addr)
+            if message is None:
+                continue
+
+            # Se podria optimizar esto con una pool de workers
+            op, params = message.split(" ", 1)
+            if op == "GET":
+                self._slave_get(params, self.leader_addr)
+            elif op == "POST":
+                key, value = message.split(":", 1)
+                self._slave_post(params, key, value, self.leader_addr)
+
+    def _slave_get(self, key, leader_addr):
+        # value = self.storage.get(key)
+        value = "TEST"
+        try:
+            self.cluster.send_to(leader_addr, value)
+        except:
+            # Leader down, abort operation
+            pass
+
+    def _slave_post(self, key, value, leader_addr):
+        # self.storage.post(key)
+        try:
+            self.cluster.send_to(leader_addr, "ACK")
+        except:
+            # Leader down, abort operation
+            pass
+
+    def leader_get(self, key: str) -> tuple[bool, str]:
         """
         gets from vault a value searching by the key
         returns (error, value)
@@ -42,7 +78,7 @@ class Vault:
 
         return False, most_updated_value[1]
 
-    def post(self, key: str, value: str) -> bool:
+    def leader_post(self, key: str, value: str) -> bool:
         """
         inserts a value by indexed by key on vault
         key must not contain the "=" character
