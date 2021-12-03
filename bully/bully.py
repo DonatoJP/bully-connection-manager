@@ -148,7 +148,6 @@ class Bully:
         self.set_is_in_election(True)
 
         self.conn_manager.send_to_mayors('ELECTION')
-
         received_ok = self.wait_get_received_ok(5)
 
         if not received_ok:
@@ -159,6 +158,7 @@ class Bully:
         self.conn_manager.send_to_all('LEADER')
         self.set_is_leader(True)
         self.set_leader_addr(None)
+        self.set_is_in_election(False)
 
     def process_election_message(self, peer_addr):
         print(f'Received ELECTION message from {peer_addr}')
