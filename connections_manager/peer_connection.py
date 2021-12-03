@@ -1,11 +1,14 @@
 import socket
-from conn_errors import PeerDownError
+from .conn_errors import PeerDownError
+from threading import Condition, Lock
 
 class PeerConnection:
     def __init__(self, addr, port) -> None:
         self.peer_addr = addr
         self.peer_port = int(port)
+
         self.peer_conn = None
+        self.peer_conn_cv = Condition(Lock())
 
     def _is_ip(self, ip):
         try:
@@ -26,11 +29,16 @@ class PeerConnection:
         return self.peer_port > peer_id
 
     def set_connection(self, conn):
+        self.peer_conn_cv.acquire()
+
         # Closing latest connection
         if self.peer_conn is not None:
             self.peer_conn.close()
 
         self.peer_conn = conn
+        self.peer_conn_cv.notify_all()
+        self.peer_conn_cv.release()
+
 
     def shutdown(self):
         if self.peer_conn:
@@ -45,7 +53,7 @@ class PeerConnection:
         peer_host = (self.peer_addr, self.peer_port)
         try:
             conn.connect(peer_host)
-            self.peer_conn = conn
+            self.set_connection(conn)
             print(
                 f'[Main Thread] Connection to {peer_host} successfully done!')
         except ConnectionRefusedError as e:
@@ -53,8 +61,7 @@ class PeerConnection:
                 f'[Main Thread] Could not connect to {peer_host}. It is not yet active...')
 
     def recv_message(self):
-        if self.peer_conn is None:
-            raise Exception("No hay socket")
+        self.peer_conn_cv.acquire()
 
         # Receive first 4 bytes (len of message)
         try:
@@ -62,9 +69,13 @@ class PeerConnection:
 
             # Receive Final Message
             msg = self._recv(int.from_bytes(msg_len, byteorder='big'))
-            return msg.decode('utf-8')
         except OSError as e:
-            raise PeerDownError 
+            self.peer_conn_cv.wait_for(self.peer_conn.fileno() != -1, None)
+            self.peer_conn_cv.release()
+            return self.recv_message()
+        
+        self.peer_conn_cv.release()
+        return msg.decode('utf-8')
 
     def send_message(self, msg: str):
         if self.peer_conn is None:
