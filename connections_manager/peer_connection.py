@@ -1,5 +1,5 @@
 import socket
-
+from conn_errors import PeerDownError
 
 class PeerConnection:
     def __init__(self, addr, port) -> None:
@@ -57,12 +57,14 @@ class PeerConnection:
             raise Exception("No hay socket")
 
         # Receive first 4 bytes (len of message)
-        msg_len = self._recv(4)
+        try:
+            msg_len = self._recv(4)
 
-        # Receive Final Message
-        msg = self._recv(int.from_bytes(msg_len, byteorder='big'))
-
-        return msg.decode('utf-8')
+            # Receive Final Message
+            msg = self._recv(int.from_bytes(msg_len, byteorder='big'))
+            return msg.decode('utf-8')
+        except OSError as e:
+            raise PeerDownError 
 
     def send_message(self, msg: str):
         if self.peer_conn is None:
