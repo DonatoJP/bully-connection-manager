@@ -18,8 +18,10 @@ class Bully:
         self.received_ok_cv = Condition(Lock())
 
         self.leader_addr = None
+        self.leader_addr_cv = Condition(Lock())
 
         self.is_leader = False
+        self.is_leader_cv = Condition(Lock())
 
         for ph in peer_hostnames:
             th = Thread(target=self.start_receiving_from_peer, args=(ph,))
@@ -38,6 +40,28 @@ class Bully:
     #             self.conn_manager.send_to(self.leader_addr, 'PING')
 
     #         time.sleep(5)
+
+    def get_is_leader(self):
+        self.is_leader_cv.acquire()
+        is_leader = self.is_leader
+        self.is_leader_cv.release()
+        return is_leader
+
+    def set_is_leader(self, value):
+        self.is_leader_cv.acquire()
+        self.is_leader = value
+        self.is_leader_cv.release()
+
+    def get_leader_addr(self):
+        self.leader_addr_cv.acquire()
+        leader_addr = self.leader_addr
+        self.leader_addr_cv.release()
+        return leader_addr
+
+    def set_leader_addr(self, value):
+        self.leader_addr_cv.acquire()
+        self.leader_addr = value
+        self.leader_addr_cv.release()
 
     def get_is_in_election(self):
         self.is_in_election_cv.acquire()
@@ -79,7 +103,7 @@ class Bully:
         self.set_is_in_election(True)
 
         self.conn_manager.send_to_mayors('ELECTION')
-        #time.sleep(5)
+
         received_ok = self.wait_get_received_ok(5)
 
         if not received_ok:
@@ -88,8 +112,8 @@ class Bully:
     def proclaim_leader(self):
         print('I am the new LEADER !')
         self.conn_manager.send_to_all('LEADER')
-        self.is_leader = True
-        self.leader_addr = None
+        self.set_is_leader(True)
+        self.set_leader_addr(None)
 
     def process_election_message(self, peer_addr):
         print(f'Received ELECTION message from {peer_addr}')
@@ -104,10 +128,10 @@ class Bully:
 
     def process_leader_message(self, peer_addr):
         print(f'Received LEADER message from {peer_addr}')
-        self.leader_addr = peer_addr
-        self.is_leader = False
+        self.set_leader_addr(peer_addr)
+        self.set_is_leader(False)
 
-        print(f'My new LEADER is now {self.leader_addr} !!')
+        print(f'My new LEADER is now {peer_addr} !!')
         self.reset_election_variables()
 
     def reset_election_variables(self):
