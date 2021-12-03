@@ -7,8 +7,19 @@ class PeerConnection:
         self.peer_port = int(port)
         self.peer_conn = None
 
+    def _is_ip(self, ip):
+        try:
+            socket.inet_aton(ip)
+        except socket.error:
+            return False
+
+        return True
+
     def is_peer(self, peer_addr):
-        hostname = socket.gethostbyaddr(peer_addr)[0].split('.')[0]
+        if self._is_ip(peer_addr):
+            hostname = socket.gethostbyaddr(peer_addr)[0].split('.')[0]
+        else:
+            hostname = peer_addr.split(":")[0]
         return self.peer_addr == hostname
 
     def set_connection(self, conn):
