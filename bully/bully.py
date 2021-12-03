@@ -16,6 +16,9 @@ class Bully:
 
         self.received_ok = False
         self.received_ok_cv = Condition(Lock())
+        
+        self.received_ping_echo = False
+        self.received_ping_echo_cv = Condition(Lock())
 
         self.leader_addr = None
         self.leader_addr_cv = Condition(Lock())
@@ -29,17 +32,35 @@ class Bully:
             th.start()
             self.threads.append(th)
         
-        # ping_thread = Thread(target=self.poll_leader)
-        # ping_thread.daemon = True
-        # ping_thread.start()
-        # self.threads.append(ping_thread)
+        ping_thread = Thread(target=self.poll_leader)
+        ping_thread.daemon = True
+        ping_thread.start()
+        self.threads.append(ping_thread)
 
-    # def poll_leader(self):
-    #     while True:
-    #         if not self.is_leader and not self.is_in_election:
-    #             self.conn_manager.send_to(self.leader_addr, 'PING')
+    def poll_leader(self):
+        while True:
+            self.is_leader_cv.acquire()
+            self.is_in_election_cv.acquire()
+            self.leader_addr_cv.acquire()
 
-    #         time.sleep(5)
+            if not self.is_leader and not self.is_in_election and self.leader_addr is not None:
+                self.is_leader_cv.release()
+                self.is_in_election_cv.release()
+                
+                self.conn_manager.send_to(self.leader_addr, 'PING')
+                self.leader_addr_cv.release()
+
+                received_ping_echo = self.wait_get_received_ping_echo(3)
+                if not received_ping_echo:
+                    print(f'I detect that LEADER is down. Beggining with election process...')
+                    self.begin_election_process()
+            else: 
+                self.is_leader_cv.release()
+                self.is_in_election_cv.release()
+                self.leader_addr_cv.release()
+            
+            self.set_received_ping_echo(False)
+            time.sleep(5)
 
     def get_is_leader(self):
         self.is_leader_cv.acquire()
@@ -94,9 +115,33 @@ class Bully:
 
     def notify_set_received_ok(self, value):
         self.received_ok_cv.acquire()
-        self.received_ok = True
+        self.received_ok = value
         self.received_ok_cv.notify_all()
         self.received_ok_cv.release()
+
+    def wait_get_received_ping_echo(self, timeout):
+        self.received_ping_echo_cv.acquire()
+        self.received_ping_echo_cv.wait(timeout)
+        received_ping_echo = self.received_ping_echo
+        self.received_ping_echo_cv.release()
+        return received_ping_echo
+    
+    def notify_set_received_ping_echo(self, value):
+        self.received_ping_echo_cv.acquire()
+        self.received_ping_echo = value
+        self.received_ping_echo_cv.notify_all()
+        self.received_ping_echo_cv.release()
+    
+    def get_received_ping_echo(self):
+        self.received_ping_echo_cv.acquire()
+        received_ping_echo = self.received_ping_echo
+        self.received_ping_echo_cv.release()
+        return received_ping_echo
+    
+    def set_received_ping_echo(self, value):
+        self.received_ping_echo_cv.acquire()
+        self.received_ping_echo = value
+        self.received_ping_echo_cv.release()
 
     def begin_election_process(self):
         if self.get_is_in_election(): return
@@ -137,7 +182,9 @@ class Bully:
     def reset_election_variables(self):
         self.set_is_in_election(False)
         self.set_received_ok(False)
-
+    
+    def echo_ping(self, peer_addr):
+        self.conn_manager.send_to(peer_addr, 'ECHO_PING')
 
     def start_receiving_from_peer(self, peer_addr):
         print(f'Starting to receive from {peer_addr}')
@@ -149,6 +196,10 @@ class Bully:
                 self.process_ok_message(peer_addr)
             elif msg == 'LEADER':
                 self.process_leader_message(peer_addr)
+            elif msg == 'PING':
+                self.echo_ping(peer_addr)
+            elif msg == 'ECHO_PING':
+                self.notify_set_received_ping_echo(True)
 
 
         
