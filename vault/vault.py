@@ -12,10 +12,9 @@ CLUSTER_QUORUM = ceil(CLUSTER_SIZE / 2)
 class Vault:
     """Distributed, replicated, highly available kay-value store"""
 
-    def __init__(self, cluster: ConnectionsManager, cluster_addresses: list[str]):
+    def __init__(self, cluster: ConnectionsManager):
         self.cluster = cluster
         self.pool = ThreadPool(len(cluster.connections))
-        self.cluster_addresses = cluster_addresses
 
     def validate_key(self, key):
         ILLEGAL_CHARS = ["="]
@@ -37,12 +36,12 @@ class Vault:
             if op == "GET":
                 self._slave_get(params, self.leader_addr)
             elif op == "POST":
-                key, value = message.split(":", 1)
-                self._slave_post(params, key, value, self.leader_addr)
+                key, value = message.split("=", 1)
+                self._slave_post(key, value, self.leader_addr)
 
     def _slave_get(self, key, leader_addr):
         # value = self.storage.get(key)
-        value = "TEST"
+        value = "1:TEST"
         try:
             self.cluster.send_to(leader_addr, value)
         except:
@@ -57,7 +56,7 @@ class Vault:
             # Leader down, abort operation
             pass
 
-    def leader_get(self, key: str) -> tuple[bool, str]:
+    def leader_get(self, key: str) -> tuple:
         """
         gets from vault a value searching by the key
         returns (error, value)
@@ -89,7 +88,7 @@ class Vault:
         self.cluster.send_to_all(message)
         responses = self._get_responses()
 
-        return len(filter(lambda res: res == "ACK", responses)) >= CLUSTER_QUORUM
+        return responses.count("ACK") >= CLUSTER_QUORUM
 
     def _get_responses(self):
         return self.pool.map(self.cluster.recv_from, self.cluster.addresses)
