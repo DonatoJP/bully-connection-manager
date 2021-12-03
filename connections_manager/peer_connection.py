@@ -36,6 +36,7 @@ class PeerConnection:
             self.peer_conn.close()
 
         self.peer_conn = conn
+        print(f'Setting new connection: {conn}')
         self.peer_conn_cv.notify_all()
         self.peer_conn_cv.release()
 
@@ -61,7 +62,6 @@ class PeerConnection:
                 f'[Main Thread] Could not connect to {peer_host}. It is not yet active...')
 
     def recv_message(self):
-        self.peer_conn_cv.acquire()
 
         # Receive first 4 bytes (len of message)
         try:
@@ -70,12 +70,15 @@ class PeerConnection:
             # Receive Final Message
             msg = self._recv(int.from_bytes(msg_len, byteorder='big'))
         except OSError as e:
-            self.peer_conn_cv.wait_for(self.peer_conn.fileno() != -1, None)
+            self.peer_conn_cv.acquire()
+            self.peer_conn_cv.wait_for(self.perr_conn_is_valid, None)
             self.peer_conn_cv.release()
             return self.recv_message()
         
-        self.peer_conn_cv.release()
         return msg.decode('utf-8')
+    
+    def perr_conn_is_valid(self):
+        return self.peer_conn is not None and self.peer_conn.fileno() != -1
 
     def send_message(self, msg: str):
         if self.peer_conn is None:
