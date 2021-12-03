@@ -6,7 +6,7 @@ from typing import Optional
 
 class ConnectionsManager:
     def __init__(self, self_port_n: str, connections_to_create: list):
-        self.connections: PeerConnection = []
+        self.connections: list[PeerConnection] = []
         self.port_n = int(self_port_n)
         self.listener_stream = None
         self.addresses = connections_to_create
@@ -73,3 +73,10 @@ class ConnectionsManager:
             raise Exception('Invalid peer address')
 
         return peer.recv_message()
+
+    def send_to_mayors(self, message: str):
+        # TODO: Change port_n to conn_id
+        mayor_peers = filter(lambda pc: pc.is_mayor(self.port_n) , self.connections)
+
+        for mp in mayor_peers:
+            mp.send_message(message)

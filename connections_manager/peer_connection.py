@@ -11,6 +11,9 @@ class PeerConnection:
         hostname = socket.gethostbyaddr(peer_addr)[0].split('.')[0]
         return self.peer_addr == hostname
 
+    def is_mayor(self, peer_id: int):
+        return self.peer_port > peer_id
+
     def set_connection(self, conn):
         # Closing latest connection
         if self.peer_conn is not None:
