@@ -1,5 +1,5 @@
 import socket
-from conn_errors import PeerDownError
+from .conn_errors import PeerDownError
 
 class PeerConnection:
     def __init__(self, addr, port) -> None:
