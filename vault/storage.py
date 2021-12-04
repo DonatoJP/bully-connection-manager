@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from os import path
 import re
 
@@ -30,8 +31,28 @@ class Storage:
 
     def post(self, version, key, value):
         key_hash = self._get_hash(key)
-        with open(path.join(self.storage_path, key_hash), 'a+') as file:
-            file.write(self.serialize(version, key, value))
+
+        file_path = path.join(self.storage_path, key_hash)
+        # Create file if it does not exists
+        with open(file_path, 'a+'):
+            pass
+
+        written = False
+
+        with open(path.join(self.storage_path, "temp"), "w") as temp_file:
+            with open(file_path, 'r') as key_file:
+                for line in key_file:
+                    match = self.deserialize(line)
+                    if match is not None and match[1] == key:
+                        temp_file.write(self.serialize(version, key, value))
+                        written = True
+                    else:
+                        temp_file.write(line)
+
+            if not written:
+                temp_file.write(self.serialize(version, key, value))
+
+        os.rename(path.join(self.storage_path, "temp"), file_path)
 
     def version(self, key):
         key_hash = self._get_hash(key)

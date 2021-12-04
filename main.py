@@ -41,6 +41,8 @@ def main():
             vault.leader_post(f"key_{i}", f"Value {i}")
 
         print(vault.leader_get(f"key_1"))
+        print(vault.leader_get(f"key_2"))
+        print(vault.leader_get(f"key_5"))
 
     cm._join_listen_thread()
 

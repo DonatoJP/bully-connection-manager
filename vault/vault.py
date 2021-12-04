@@ -49,7 +49,7 @@ class Vault:
                 if op == "GET":
                     res = self._slave_get(params)
                 elif op == "POST":
-                    version, rest = message.split(":", 1)
+                    version, rest = params.split(":", 1)
                     key, value = rest.split("=", 1)
                     res = self._slave_post(version, key, value)
                 elif op == "VERSION":
