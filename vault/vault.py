@@ -6,18 +6,15 @@ from connections_manager import ConnectionsManager
 from .storage import Storage
 
 
-CLUSTER_SIZE = 5
-CLUSTER_QUORUM = ceil(CLUSTER_SIZE / 2)
-
-
 class Vault:
     """Distributed, replicated, highly available kay-value store"""
 
-    def __init__(self, cluster: ConnectionsManager):
+    def __init__(self, cluster: ConnectionsManager, storage_path="/storage", buckets_number=20):
         self.cluster = cluster
         self.pool = ThreadPool(len(cluster.connections))
-        self.storage = Storage("/storage")
+        self.storage = Storage(storage_path, buckets_number)
         self.leader_addr_lock = Lock()
+        self.cluster_quorum = ceil(len(self.cluster.connections) / 2)
 
     def validate_key(self, key):
         if not key:
@@ -94,7 +91,7 @@ class Vault:
         responses = self._get_responses()
         responses.append(self._slave_get(key))
 
-        if len(responses) < CLUSTER_QUORUM:
+        if len(responses) < self.cluster_quorum:
             return True, None
 
         def parse_respone(res):
@@ -129,7 +126,7 @@ class Vault:
         responses = self._get_responses()
         responses.append(self._slave_version(key))
 
-        if len(responses) < CLUSTER_QUORUM:
+        if len(responses) < self.cluster_quorum:
             return True
 
         print(f"Got responses: {responses}")
@@ -148,7 +145,7 @@ class Vault:
 
         print(f"Got responses: {responses}")
 
-        return responses.count("ACK") < CLUSTER_QUORUM
+        return responses.count("ACK") < self.cluster_quorum
 
     def _get_responses(self):
         return self.pool.map(self.cluster.recv_from, self.cluster.addresses)
