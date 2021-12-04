@@ -22,7 +22,10 @@ def main():
 
     signal.signal(signal.SIGTERM, __exit_gracefully)
 
+    print("Waiting for initialization...")
     time.sleep(5)
+
+    print("Initialization finished!")
 
     i_am_leader = os.environ.get('LEADER', False)
 
@@ -33,7 +36,8 @@ def main():
         vault.slave_listen()
     else:
         for i in range(5):
-            time.sleep(5)
+            time.sleep(1)
+            print(f"Saving key {i}")
             vault.leader_post(f"key_{i}", f"Value {i}")
 
         print(vault.leader_get(f"key_1"))

@@ -1,8 +1,9 @@
 from math import ceil
-from socket import timeout
+from multiprocessing.pool import ThreadPool
+from threading import Lock
 
 from connections_manager import ConnectionsManager
-from multiprocessing.pool import ThreadPool
+from .storage import Storage
 
 
 CLUSTER_SIZE = 5
@@ -15,80 +16,139 @@ class Vault:
     def __init__(self, cluster: ConnectionsManager):
         self.cluster = cluster
         self.pool = ThreadPool(len(cluster.connections))
+        self.storage = Storage("/storage")
+        self.leader_addr_lock = Lock()
 
     def validate_key(self, key):
-        ILLEGAL_CHARS = ["="]
+        if not key:
+            raise ValueError("key must not be empty")
+        ILLEGAL_CHARS = ["=", "\r", "\n"]
         if any(c in key for c in ILLEGAL_CHARS):
             raise ValueError("key contains illegal characters")
 
+    def validate_value(self, value):
+        if not value:
+            raise ValueError("value must not be empty")
+        ILLEGAL_CHARS = ["\r", "\n"]
+        if any(c in value for c in ILLEGAL_CHARS):
+            raise ValueError("value contains illegal characters")
+
     def set_leader_addr(self, leader_addr):
-        self.leader_addr = leader_addr
+        with self.leader_addr_lock:
+            self.leader_addr = leader_addr
 
     def slave_listen(self):
         while True:
-            # Necesitamos un timeout para que cada tanto salga del recv_from y pueda cambiar de leader
-            message = self.cluster.recv_from(self.leader_addr)
-            if message is None:
-                continue
+            # Solo se puede cambiar el leader cuando no hay una operacion siendo procesada
+            with self.leader_addr_lock:
 
-            # Se podria optimizar esto con una pool de workers
-            op, params = message.split(" ", 1)
-            if op == "GET":
-                self._slave_get(params, self.leader_addr)
-            elif op == "POST":
-                key, value = message.split("=", 1)
-                self._slave_post(key, value, self.leader_addr)
+                # Necesitamos un timeout para que cada tanto salga del recv_from y pueda cambiar de leader
+                message = self.cluster.recv_from(self.leader_addr)
+                if message is None:
+                    continue
 
-    def _slave_get(self, key, leader_addr):
-        # value = self.storage.get(key)
-        value = "1:TEST"
-        try:
-            self.cluster.send_to(leader_addr, value)
-        except:
-            # Leader down, abort operation
-            pass
+                # Se podria optimizar esto con una pool de workers?
+                op, params = message.split(" ", 1)
+                if op == "GET":
+                    res = self._slave_get(params)
+                elif op == "POST":
+                    version, rest = message.split(":", 1)
+                    key, value = rest.split("=", 1)
+                    res = self._slave_post(version, key, value)
+                elif op == "VERSION":
+                    res = self._slave_version(params)
 
-    def _slave_post(self, key, value, leader_addr):
-        # self.storage.post(key)
-        try:
-            self.cluster.send_to(leader_addr, "ACK")
-        except:
-            # Leader down, abort operation
-            pass
+                try:
+                    self.cluster.send_to(self.leader_addr, res)
+                except:
+                    # Leader down, abort operation
+                    pass
+
+    def _slave_get(self, key):
+        res = self.storage.get(key)
+        if res is None:
+            return "0:"
+
+        version, value = res
+        return f"{version}:{value}"
+
+    def _slave_post(self, version, key, value):
+        self.storage.post(version, key, value)
+        return "ACK"
+
+    def _slave_version(self, key):
+        return str(self.storage.version(key))
 
     def leader_get(self, key: str) -> tuple:
         """
         gets from vault a value searching by the key
-        returns (error, value)
+        returns (retry, value)
 
-        if error is false and value is none, means that the key was not found in the store
+        if error is false and value is none, it means that the key was not found in the store
         """
+        key = key.strip()
         self.validate_key(key)
 
         message = f"GET {key}"
         self.cluster.send_to_all(message)
         responses = self._get_responses()
+        responses.append(self._slave_get(key))
 
         if len(responses) < CLUSTER_QUORUM:
             return True, None
 
-        parsed_responses = map(lambda res: res.split(':', 1), responses)
-        most_updated_value = max(parsed_responses, key=lambda res: res[0])
+        def parse_respone(res):
+            version, value = res.split(':', 1)
+            return int(version), value
 
-        return False, most_updated_value[1]
+        parsed_responses = map(parse_respone, responses)
+        most_recent_value = max(parsed_responses, key=lambda res: res[0])
+
+        if most_recent_value[0] == 0:
+            return False, None
+
+        return False, most_recent_value[1]
 
     def leader_post(self, key: str, value: str) -> bool:
         """
         inserts a value by indexed by key on vault
-        key must not contain the "=" character
-        """
-        self.validate_key(key)
+        key must not contain "=" or newline characters
+        value must not contain the newline character
+        key will be striped
 
-        message = f"POST {key}={value}"
+        returns True if client must retry
+        """
+        key = key.strip()
+        self.validate_key(key)
+        self.validate_value(key)
+
+        print("Getting versions")
+
+        message = f"VERSION {key}"
         self.cluster.send_to_all(message)
         responses = self._get_responses()
+        responses.append(self._slave_version(key))
 
-        return responses.count("ACK") >= CLUSTER_QUORUM
+        if len(responses) < CLUSTER_QUORUM:
+            return True
+
+        print(f"Got responses: {responses}")
+
+        parsed_responses = map(lambda res: int(res), responses)
+        next_version = max(parsed_responses) + 1
+
+        print(f"Next version: {next_version}")
+
+        print(f"Executing posts")
+
+        message = f"POST {next_version}:{key}={value}"
+        self.cluster.send_to_all(message)
+        responses = self._get_responses()
+        responses.append(self._slave_post(next_version, key, value))
+
+        print(f"Got responses: {responses}")
+
+        return responses.count("ACK") < CLUSTER_QUORUM
 
     def _get_responses(self):
         return self.pool.map(self.cluster.recv_from, self.cluster.addresses)

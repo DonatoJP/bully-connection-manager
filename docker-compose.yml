@@ -13,6 +13,8 @@ services:
     entrypoint: python3 main.py
     networks:
       - bully-example
+    volumes:
+        - ./storage/app1:/storage
 
   app2:
     container_name: app2
@@ -25,6 +27,8 @@ services:
     command: ["./wait-for", "app1:9000", "--", "python", "main.py"]
     networks:
       - bully-example
+    volumes:
+        - ./storage/app2:/storage
 
   app3:
     container_name: app3
@@ -37,6 +41,8 @@ services:
     command: ["./wait-for", "app2:9001", "--", "python", "main.py"]
     networks:
       - bully-example
+    volumes:
+        - ./storage/app3:/storage
 
 networks:
   bully-example:
