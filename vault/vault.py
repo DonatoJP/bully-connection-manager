@@ -140,6 +140,7 @@ class Vault:
 
         message = f"POST {next_version}:{key}={value}"
         self.cluster.send_to_all(message)
+        # Que get responses no espere a todos. Que pueda salir una vez que ya tiene quorum
         responses = self._get_responses()
         responses.append(self._slave_post(next_version, key, value))
 
