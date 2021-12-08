@@ -3,9 +3,10 @@ from .conn_errors import PeerDownError
 from threading import Condition, Lock
 
 class PeerConnection:
-    def __init__(self, addr, port) -> None:
+    def __init__(self, addr, port, node_id) -> None:
         self.peer_addr = addr
         self.peer_port = int(port)
+        self.node_id = int(node_id)
 
         self.peer_conn = None
         self.peer_conn_cv = Condition(Lock())
@@ -26,7 +27,7 @@ class PeerConnection:
         return self.peer_addr == hostname
 
     def is_higher(self, peer_id: int):
-        return self.peer_port > peer_id
+        return self.node_id > peer_id
 
     def set_connection(self, conn):
         self.peer_conn_cv.acquire()

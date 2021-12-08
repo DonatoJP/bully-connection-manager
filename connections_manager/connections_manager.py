@@ -5,15 +5,17 @@ from typing import Optional
 
 
 class ConnectionsManager:
-    def __init__(self, self_port_n: str, connections_to_create: list):
+    def __init__(self, node_id: str, self_port_n: str, connections_to_create: list):
         self.connections: list[PeerConnection] = []
+        self.node_id = int(node_id)
         self.port_n = int(self_port_n)
         self.listener_stream = None
         self.addresses = connections_to_create
 
         for c in connections_to_create:
-            addr, port = c.split(':')
-            self.connections.append(PeerConnection(addr, port))
+            id_addr, port = c.split(':')
+            id, addr = id_addr.split('-')
+            self.connections.append(PeerConnection(addr, port, id))
 
         # Open Listening process
         self.t1 = Thread(target=self._init_listening_port)
@@ -41,7 +43,7 @@ class ConnectionsManager:
         stream.bind(('0.0.0.0', self.port_n))
         stream.listen()
         self.listener_stream = stream
-        print(f'[Listener Thread] Begin listening in {self.port_n}')
+        print(f'[Node {self.node_id} Listener Thread] Begin listening in {self.port_n}')
         while True:
             conn, client_addr = stream.accept()
             peer_connection = self._find_peer(client_addr[0])
@@ -50,7 +52,7 @@ class ConnectionsManager:
                 continue
 
             print(
-                f'[Listener Thread] Incoming connection request from {socket.gethostbyaddr(client_addr[0])[0].split(".")[0]}')
+                f'[Node {self.node_id} Listener Thread] Incoming connection request from {socket.gethostbyaddr(client_addr[0])[0].split(".")[0]}')
             peer_connection.set_connection(conn)
 
     def _find_peer(self, peer_addr) -> Optional[PeerConnection]:
@@ -76,7 +78,7 @@ class ConnectionsManager:
 
     def send_to_higher(self, message: str):
         # TODO: Change port_n to conn_id
-        higher_peers = filter(lambda pc: pc.is_higher(self.port_n) , self.connections)
+        higher_peers = filter(lambda pc: pc.is_higher(self.node_id) , self.connections)
 
         for mp in higher_peers:
             mp.send_message(message)

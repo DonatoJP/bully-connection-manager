@@ -5,10 +5,10 @@ import os, signal, sys, time, socket
 
 def main():
     port_n = os.environ['LISTEN_PORT']
-    self_hostname = os.environ['HOSTNAME']
-    peer_addrs = os.environ['PEER_ADDRESS'].split(',')
-    print(f'Starting App with LISTEN_PORT={port_n} and PEER_ADDRESS={peer_addrs}')
-    cm = ConnectionsManager(port_n, peer_addrs)
+    peer_addrs = os.environ['PEERS_INFO'].split(',')
+    node_id = os.environ['NODE_ID']
+    print(f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
+    cm = ConnectionsManager(node_id, port_n, peer_addrs)
 
     def __exit_gracefully(*args):
         print("Received SIGTERM signal. Starting graceful exit...")
@@ -18,7 +18,7 @@ def main():
     signal.signal(signal.SIGTERM, __exit_gracefully)
 
     time.sleep(5)
-    peer_hostnames = list(map(lambda x: x.split(':')[0], peer_addrs))
+    peer_hostnames = list(map(lambda x: x.split(':')[0].split('-')[1], peer_addrs))
     bully = Bully(cm, peer_hostnames)
     bully.begin_election_process()
 
