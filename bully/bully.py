@@ -147,8 +147,8 @@ class Bully:
         if self.get_is_in_election(): return
         self.set_is_in_election(True)
 
-        self.conn_manager.send_to_mayors('ELECTION')
-        received_ok = self.wait_get_received_ok(5)
+        self.conn_manager.send_to_higher('ELECTION')
+        received_ok = self.wait_get_received_ok(5) # TODO: Timeout as env var
 
         if not received_ok:
             self.proclaim_leader()

@@ -25,7 +25,7 @@ class PeerConnection:
             hostname = peer_addr.split(":")[0]
         return self.peer_addr == hostname
 
-    def is_mayor(self, peer_id: int):
+    def is_higher(self, peer_id: int):
         return self.peer_port > peer_id
 
     def set_connection(self, conn):
@@ -70,6 +70,7 @@ class PeerConnection:
             # Receive Final Message
             msg = self._recv(int.from_bytes(msg_len, byteorder='big'))
         except OSError as e:
+            print('Connection closed?')
             self.peer_conn_cv.acquire()
             self.peer_conn_cv.wait_for(self.perr_conn_is_valid, None)
             self.peer_conn_cv.release()

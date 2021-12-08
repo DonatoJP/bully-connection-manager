@@ -74,9 +74,9 @@ class ConnectionsManager:
 
         return peer.recv_message()
 
-    def send_to_mayors(self, message: str):
+    def send_to_higher(self, message: str):
         # TODO: Change port_n to conn_id
-        mayor_peers = filter(lambda pc: pc.is_mayor(self.port_n) , self.connections)
+        higher_peers = filter(lambda pc: pc.is_higher(self.port_n) , self.connections)
 
-        for mp in mayor_peers:
+        for mp in higher_peers:
             mp.send_message(message)
