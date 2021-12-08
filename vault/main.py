@@ -42,10 +42,12 @@ class VaultMessageProcessor(RabbitMessageProcessor):
 
 def main():
     port_n = os.environ['LISTEN_PORT']
-    peer_addrs = os.environ['PEER_ADDRESS'].split(',')
+    peer_addrs = os.environ['PEERS_INFO'].split(',')
+    node_id = os.environ['NODE_ID']
     logging.info(
-        f'Starting App with LISTEN_PORT={port_n} and PEER_ADDRESS={peer_addrs}')
-    cluster = ConnectionsManager(port_n, peer_addrs)
+        f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
+
+    cluster = ConnectionsManager(node_id, port_n, peer_addrs)
 
     def stop_signal_handler(*args):
         cluster.shutdown_connections()
