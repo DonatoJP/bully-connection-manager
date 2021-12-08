@@ -34,7 +34,7 @@ class Vault:
         with self.leader_addr_lock:
             self.leader_addr = leader_addr
 
-    def slave_listen(self):
+    def follower_listen(self):
         while True:
             # Solo se puede cambiar el leader cuando no hay una operacion siendo procesada
             with self.leader_addr_lock:
@@ -47,13 +47,13 @@ class Vault:
                 # Se podria optimizar esto con una pool de workers?
                 op, params = message.split(" ", 1)
                 if op == "GET":
-                    res = self._slave_get(params)
+                    res = self._follower_get(params)
                 elif op == "POST":
                     version, rest = params.split(":", 1)
                     key, value = rest.split("=", 1)
-                    res = self._slave_post(version, key, value)
+                    res = self._follower_post(version, key, value)
                 elif op == "VERSION":
-                    res = self._slave_version(params)
+                    res = self._follower_version(params)
 
                 try:
                     self.cluster.send_to(self.leader_addr, res)
@@ -61,7 +61,7 @@ class Vault:
                     # Leader down, abort operation
                     pass
 
-    def _slave_get(self, key):
+    def _follower_get(self, key):
         res = self.storage.get(key)
         if res is None:
             return "0:"
@@ -69,11 +69,11 @@ class Vault:
         version, value = res
         return f"{version}:{value}"
 
-    def _slave_post(self, version, key, value):
+    def _follower_post(self, version, key, value):
         self.storage.post(version, key, value)
         return "ACK"
 
-    def _slave_version(self, key):
+    def _follower_version(self, key):
         return str(self.storage.version(key))
 
     def leader_get(self, key: str) -> tuple:
@@ -89,7 +89,7 @@ class Vault:
         message = f"GET {key}"
         self.cluster.send_to_all(message)
         responses = self._get_responses()
-        responses.append(self._slave_get(key))
+        responses.append(self._follower_get(key))
 
         if len(responses) < self.cluster_quorum:
             return True, None
@@ -124,7 +124,7 @@ class Vault:
         message = f"VERSION {key}"
         self.cluster.send_to_all(message)
         responses = self._get_responses()
-        responses.append(self._slave_version(key))
+        responses.append(self._follower_version(key))
 
         if len(responses) < self.cluster_quorum:
             return True
@@ -142,7 +142,7 @@ class Vault:
         self.cluster.send_to_all(message)
         # Que get responses no espere a todos. Que pueda salir una vez que ya tiene quorum
         responses = self._get_responses()
-        responses.append(self._slave_post(next_version, key, value))
+        responses.append(self._follower_post(next_version, key, value))
 
         print(f"Got responses: {responses}")
 
