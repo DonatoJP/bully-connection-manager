@@ -1,4 +1,6 @@
+from typing import Callable
 from connections_manager import ConnectionsManager
+from .events_enum import Event
 from threading import Thread, Condition, Lock
 import time
 
@@ -10,6 +12,7 @@ class Bully:
         self.conn_manager = connection_manager
         self.peer_hostnames = peer_hostnames
         self.threads = []
+        self.callbacks = {}
 
         self.is_in_election = False
         self.is_in_election_cv = Condition(Lock())
@@ -147,6 +150,9 @@ class Bully:
         if self.get_is_in_election(): return
         self.set_is_in_election(True)
 
+        if Event.ELECTION_STARTED in self.callbacks:
+            self.callbacks[Event.ELECTION_STARTED]()
+
         self.conn_manager.send_to_higher('ELECTION')
         received_ok = self.wait_get_received_ok(5) # TODO: Timeout as env var
 
@@ -158,7 +164,11 @@ class Bully:
         self.conn_manager.send_to_all('LEADER')
         self.set_is_leader(True)
         self.set_leader_addr(None)
-        self.set_is_in_election(False)
+
+        self.reset_election_variables()
+
+        if Event.NEW_LEADER in self.callbacks:
+            self.callbacks[Event.NEW_LEADER]()
 
     def process_election_message(self, peer_addr):
         print(f'Received ELECTION message from {peer_addr}')
@@ -178,6 +188,9 @@ class Bully:
 
         print(f'My new LEADER is now {peer_addr} !!')
         self.reset_election_variables()
+
+        if Event.NEW_LEADER in self.callbacks:
+            self.callbacks[Event.NEW_LEADER]()
 
     def reset_election_variables(self):
         self.set_is_in_election(False)
@@ -200,6 +213,9 @@ class Bully:
                 self.echo_ping(peer_addr)
             elif msg == 'ECHO_PING':
                 self.notify_set_received_ping_echo(True)
+
+    def set_callback(self, event: Event, callback: Callable):
+        self.callbacks[event] = callback
 
 
         
