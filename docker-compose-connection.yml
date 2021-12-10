@@ -1,0 +1,46 @@
+version: '3.8'
+services:
+  app1:
+    container_name: app1
+    image: bully-example:latest
+    environment:
+      - PYTHONUNBUFFERED=1
+      - NODE_ID=1
+      - LISTEN_PORT=9000
+      - PEERS_INFO=2-app2:9001,3-app3:9002
+    ports:
+      - 9000:9000
+    entrypoint: python3 main.py
+    networks:
+      - bully-example
+  
+  app2:
+    container_name: app2
+    image: bully-example:latest
+    environment:
+      - PYTHONUNBUFFERED=1
+      - NODE_ID=2
+      - LISTEN_PORT=9001
+      - PEERS_INFO=1-app1:9000,3-app3:9002
+    command: ["./wait-for", "app1:9000", "--", "python", "main.py"]
+    networks:
+      - bully-example
+  
+  app3:
+    container_name: app3
+    image: bully-example:latest
+    environment:
+      - PYTHONUNBUFFERED=1
+      - NODE_ID=3
+      - LISTEN_PORT=9002
+      - PEERS_INFO=1-app1:9000,2-app2:9001
+    command: ["./wait-for", "app2:9001", "--", "python", "main.py"]
+    networks:
+      - bully-example
+
+networks:
+  bully-example:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.210.0/24
