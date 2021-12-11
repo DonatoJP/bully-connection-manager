@@ -60,6 +60,25 @@ services:
     networks:
       - bully-example
 
+  heartbeat_3:
+    build: .
+    env_file:
+      - .env
+    volumes: *heartbeat_volumes
+    entrypoint: python3 heartbeat/main.py
+    networks:
+      - bully-example
+
+  heartbeat_4:
+    build: .
+    env_file:
+      - .env
+    volumes: *heartbeat_volumes
+    entrypoint: python3 heartbeat/main.py
+    networks:
+      - bully-example
+
+
 
 
 networks:
