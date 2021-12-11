@@ -1,12 +1,35 @@
-from multiprocessing import process
+from bully import Bully, Event
 from connections_manager import ConnectionsManager
-import os, signal, sys, time
+from coordinator.state import State
+import os, signal, sys, time, logging, threading
+import coordinator.server as server
+import coordinator.reviver as reviver
+import heartbeat.heartbeat as heartbeat
+
+def new_leader_callback():
+    # is_leader = state["is_leader"]
+    print('CALLBACK: NEW_LEADER')
+
+def election_callback():
+    print('CALLBACK: ELECTION_STARTED')
+
+state = State()
+state.init(threading.Lock())
+
+format = "%(asctime)s: %(message)s"
+logging.basicConfig(format=format, level=logging.INFO,
+                    datefmt="%H:%M:%S")
+
 
 def main():
+    heartbeat_t = threading.Thread(target=heartbeat.run)
+    heartbeat_t.start()
+
+
     port_n = os.environ['LISTEN_PORT']
-    peer_addrs = os.environ['PEERS_INFO'].split(',')
     node_id = os.environ['NODE_ID']
-    print(f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
+    peer_addrs = [addr for addr in os.environ['PEERS_INFO'].split(',') if not f"{node_id}-" in addr]
+    logging.info(f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
     cm = ConnectionsManager(node_id, port_n, peer_addrs)
 
     def __exit_gracefully(*args):
@@ -17,15 +40,27 @@ def main():
     signal.signal(signal.SIGTERM, __exit_gracefully)
 
     time.sleep(5)
-    cm.send_to_all(f'Hola 1 desde {port_n} !!')
-    cm.send_to_all(f'Hola 2 desde {port_n} !!')
-    for peer in peer_addrs:
-        peer_addr = peer.split(':')[0].split('-')[1]
-        received = cm.recv_from(peer_addr)
-        print(f'Received from {peer_addr}: {received}')
-        received = cm.recv_from(peer_addr)
-        print(f'Received from {peer_addr}: {received}')
+    peer_hostnames = list(map(lambda x: x.split(':')[0].split('-')[1], peer_addrs))
+    bully = Bully(cm, peer_hostnames)
+
+    bully.set_callback(Event.NEW_LEADER, new_leader_callback)
+    bully.set_callback(Event.ELECTION_STARTED, election_callback)
+
+    bully.begin_election_process()
+
+    udp_server = threading.Thread(target=server.run, args=(state,))
+    state_checker = threading.Thread(target=reviver.run, args=(state,bully))
+
+    logging.info("Main    : before running thread")
+    udp_server.start()
+    state_checker.start()
+    logging.info("Main    : wait for the thread to finish")
+    udp_server.join()
+    state_checker.join()
+    heartbeat_t.join()
+    logging.info("Main    : all done")
     cm._join_listen_thread()
+
 
 if __name__ == '__main__':
     main()

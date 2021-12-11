@@ -11,7 +11,7 @@ services:
       - ./state.txt:/app/state.txt
       # - ./app/:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    entrypoint: python3 test_bully.py
+    entrypoint: python3 main.py
     networks:
       - bully-example
   
@@ -26,7 +26,7 @@ services:
       - ./state.txt:/app/state.txt
       # - ./app/:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    command: ["./wait-for", "app1:9000", "--", "python", "test_bully.py"]
+    command: ["./wait-for", "app1:9000", "--", "python", "main.py"]
     networks:
       - bully-example
   
@@ -41,7 +41,7 @@ services:
       - ./state.txt:/app/state.txt
       # - ./app/:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    command: ["./wait-for", "app2:9000", "--", "python", "test_bully.py"]
+    command: ["./wait-for", "app2:9000", "--", "python", "main.py"]
     networks:
       - bully-example
 
