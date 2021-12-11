@@ -4,6 +4,7 @@ from coordinator.state import State
 import os, signal, sys, time, logging, threading
 import coordinator.server as server
 from coordinator.reviver import Reviver
+import heartbeat
 from heartbeat.heartbeat import Heartbeat
 
 def new_leader_callback():
@@ -21,9 +22,10 @@ logging.basicConfig(format=format, level=logging.INFO,
 
 
 def main():
+    threads = []
     heartbeat_t = Heartbeat()
     heartbeat_t.start()
-
+    threads.append(heartbeat_t)
 
     port_n = os.environ['LISTEN_PORT']
     node_id = os.environ['NODE_ID']
@@ -47,17 +49,17 @@ def main():
 
     bully.begin_election_process()
 
-    udp_server = threading.Thread(target=server.run, args=(state,))
-    state_checker = Reviver(state,bully)
-
-    logging.info("Main    : before running thread")
+    udp_server = UdpServer(state) #threading.Thread(target=server.run, args=(state,))
     udp_server.start()
+    threads.append(udp_server)
+
+    state_checker = Reviver(state,bully)
     state_checker.start()
-    logging.info("Main    : wait for the thread to finish")
-    udp_server.join()
-    state_checker.join()
-    heartbeat_t.join()
-    logging.info("Main    : all done")
+    threads.append(state_checker)
+
+
+    [t.join() for t in threads]
+
     cm._join_listen_thread()
 
 
