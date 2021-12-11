@@ -2,9 +2,8 @@ from bully import Bully, Event
 from connections_manager import ConnectionsManager
 from coordinator.state import State
 import os, signal, sys, time, logging, threading
-import coordinator.server as server
+from coordinator.server import UdpServer
 from coordinator.reviver import Reviver
-import heartbeat
 from heartbeat.heartbeat import Heartbeat
 
 def new_leader_callback():

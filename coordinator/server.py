@@ -5,7 +5,8 @@ import logging
 from datetime import datetime
 from threading import Thread
 
-class Reviver(Thread):
+
+class UdpServer(Thread):
     def __init__(self, state):
         # Call the Thread class's init function
         Thread.__init__(self)
@@ -13,15 +14,17 @@ class Reviver(Thread):
 
     def run(self):
         logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-        logging.info("Started Server",)
+        logging.info(
+            "Started Server",
+        )
         serverSocket = socket(AF_INET, SOCK_DGRAM)
 
-        serverSocket.bind(('', 12000))
+        serverSocket.bind(("", 12000))
         bufsize = 1024
         counter = 0
         while True:
             message, address = serverSocket.recvfrom(bufsize)
-            data = message.decode('utf-8')
+            data = message.decode("utf-8")
             message_json = json.loads(data)
             host = message_json["host"]
             message = message_json["message"]
