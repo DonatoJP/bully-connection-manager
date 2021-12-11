@@ -3,15 +3,14 @@ from connections_manager import ConnectionsManager
 from coordinator.state import State
 import os, signal, sys, time, logging, threading
 import coordinator.server as server
-import coordinator.reviver as reviver
-import heartbeat.heartbeat as heartbeat
+from coordinator.reviver import Reviver
+from heartbeat.heartbeat import Heartbeat
 
 def new_leader_callback():
-    # is_leader = state["is_leader"]
-    print('CALLBACK: NEW_LEADER')
+    logging.info('CALLBACK: NEW_LEADER')
 
 def election_callback():
-    print('CALLBACK: ELECTION_STARTED')
+    logging.info('CALLBACK: ELECTION_STARTED')
 
 state = State()
 state.init(threading.Lock())
@@ -22,7 +21,7 @@ logging.basicConfig(format=format, level=logging.INFO,
 
 
 def main():
-    heartbeat_t = threading.Thread(target=heartbeat.run)
+    heartbeat_t = Heartbeat()
     heartbeat_t.start()
 
 
@@ -49,7 +48,7 @@ def main():
     bully.begin_election_process()
 
     udp_server = threading.Thread(target=server.run, args=(state,))
-    state_checker = threading.Thread(target=reviver.run, args=(state,bully))
+    state_checker = Reviver(state,bully)
 
     logging.info("Main    : before running thread")
     udp_server.start()
