@@ -4,6 +4,7 @@ import signal
 import time
 
 from connections_manager import ConnectionsManager
+from bully import Bully, Event
 
 from .server import RabbitMessageProcessor, RabbitConsumerServer
 from .vault import Vault
@@ -55,42 +56,55 @@ def leader_start(vault: Vault):
     server.start()
 
 
-def follower_start(vault: Vault):
-    leader_address = os.environ['LEADER_ADDRESS']
-    vault.set_leader_addr(leader_address)
+def follower_start(vault: Vault, leader_addr):
+    vault.set_leader_addr(leader_addr)
     vault.follower_listen()
 
 
 def main():
     logging.basicConfig(level="INFO")
 
-    port_n = os.environ['LISTEN_PORT']
-    peer_addrs = os.environ['PEERS_INFO'].split(',')
     node_id = os.environ['NODE_ID']
-    logging.info(
-        f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
+    logging.info(f'Starting node {node_id}')
 
-    cluster = ConnectionsManager(node_id, port_n, peer_addrs)
+    vault_peers = [addr for addr in os.environ['VAULT_PEERS_INFO'].split(
+        ',') if not addr.startswith(f"{node_id}-")]
+    vault_port = os.environ['VAULT_LISTEN_PORT']
+    vault_cm = ConnectionsManager(node_id, vault_port, vault_peers)
+
+    bully_peers = [addr for addr in os.environ['BULLY_PEERS_INFO'].split(
+        ',') if not addr.startswith(f"{node_id}-")]
+    print(bully_peers)
+    bully_port = os.environ['BULLY_LISTEN_PORT']
+    bully_cm = ConnectionsManager(node_id, bully_port, bully_peers)
 
     def stop_signal_handler(*args):
-        cluster.shutdown_connections()
+        vault_cm.shutdown_connections()
+        bully_cm.shutdown_connections()
 
     signal.signal(signal.SIGTERM, stop_signal_handler)
     signal.signal(signal.SIGINT, stop_signal_handler)
 
     logging.info("Waiting for initialization...")
-    time.sleep(5)
 
+    time.sleep(5)
     logging.info("Initialization finished!")
 
     storage_path = os.environ['STORAGE_PATH']
     storage_buckets_number = int(os.environ['STORAGE_BUCKETS_NUMBER'])
+    vault = Vault(vault_cm, storage_path, storage_buckets_number)
 
-    vault = Vault(cluster, storage_path, storage_buckets_number)
+    peer_hostnames = [addr.split("-")[1].split(":")[0]
+                      for addr in bully_peers]
+    bully = Bully(bully_cm, peer_hostnames)
 
-    ia_am_leader = os.environ.get('LEADER', False)
+    def new_leader_callback():
+        if bully.get_is_leader():
+            leader_start(vault)
+        else:
+            leader_addr = bully.get_leader_addr()
+            follower_start(vault, leader_addr)
 
-    if ia_am_leader:
-        leader_start(vault)
-    else:
-        follower_start(vault)
+    bully.set_callback(Event.NEW_LEADER, new_leader_callback)
+
+    bully.begin_election_process()

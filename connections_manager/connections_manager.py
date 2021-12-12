@@ -80,7 +80,6 @@ class ConnectionsManager:
         return peer.recv_message()
 
     def send_to_higher(self, message: str):
-        # TODO: Change port_n to conn_id
         higher_peers = filter(lambda pc: pc.is_higher(
             self.node_id), self.connections)
 

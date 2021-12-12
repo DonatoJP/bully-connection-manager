@@ -8,4 +8,5 @@ RUN pip install pika
 RUN pip install docker
 
 COPY . .
-ENTRYPOINT [ "/bin/sh" ]
+
+ENTRYPOINT ["/bin/sh", "./wait-for", "queue_middleware:5672", "--", "python"]

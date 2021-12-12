@@ -21,7 +21,7 @@ services:
       - ./state.txt:/app/state.txt
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
-    entrypoint: python3 main.py
+    command: main.py
     networks:
       - stack-overflow-analysis
 
@@ -33,7 +33,8 @@ services:
     environment:
       - NODE_ID=2
     volumes: *coordinator-volumes
-    command: ["./wait-for", "coordinator-1:9000", "--", "python", "main.py"]
+    entrypoint: ["./wait-for", "coordinator-1:9000", "--", "python"]
+    command: main.py
     networks:
       - stack-overflow-analysis
 
@@ -44,51 +45,61 @@ services:
       - coordinator.env
     environment:
       - NODE_ID=3
-    command: ["./wait-for", "coordinator-3:9000", "--", "python", "main.py"]
+    entrypoint: ["./wait-for", "coordinator-2:9000", "--", "python"]
+    command: main.py
     volumes: *coordinator-volumes
     networks:
       - stack-overflow-analysis
 
-  vault-1:
+  vault_1:
     container_name: vault_1
     build: .
     env_file:
       - vault.env
     environment:
       - NODE_ID=1
-      - LEADER=True
-    entrypoint: python3 main-vault.py
-    volumes: &vault-volumes
+    command: main-vault.py
+    volumes:
       - .:/app
       - ./storage/vault-1:/storage
     networks:
       - stack-overflow-analysis
 
-  vault-2:
+  vault_2:
     container_name: vault_2
     build: .
     env_file:
       - vault.env
     environment:
       - NODE_ID=2
-    command: ["./wait-for", "vault-1:9000", "--", "python", "main-vault.py"]
+    entrypoint: ["./wait-for", "vault_1:9000", "--", "python"]
+    command: main-vault.py
     volumes:
       - .:/app
       - ./storage/vault-2:/storage
     networks:
       - stack-overflow-analysis
 
-  vault-3:
+  vault_3:
     container_name: vault_3
     build: .
     env_file:
       - vault.env
     environment:
-      - NODE_ID=2
-    command: ["./wait-for", "vault-2:9000", "--", "python", "main-vault.py"]
+      - NODE_ID=3
+    entrypoint: ["./wait-for", "vault_2:9000", "--", "python"]
+    command: main-vault.py
     volumes:
       - .:/app
       - ./storage/vault-3:/storage
+    networks:
+      - stack-overflow-analysis
+
+
+  vault-playground:
+    build: .
+    volumes:
+      - .:/app
     networks:
       - stack-overflow-analysis
 
