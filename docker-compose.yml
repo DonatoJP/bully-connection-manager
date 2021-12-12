@@ -8,135 +8,130 @@ services:
     ports:
         - 15672:15672
     networks:
-      - bully-example
+      - stack-overflow-analysis
 
-  app1:
-    container_name: app1
+  coordinator-1:
+    container_name: coordinator_1
     build: .
     env_file:
-      - .env
+      - coordinator.env
     environment:
-      - PYTHONUNBUFFERED=1
-      - PYTHONHASHSEED=0
-      - LISTEN_PORT=9000
-      - LEADER=True
       - NODE_ID=1
-      - PEERS_INFO=2-app2:9001,3-app3:9002
-      - STORAGE_PATH=/storage
-      - STORAGE_BUCKETS_NUMBER=20
-      - RETRY_WAIT=0.5
-      - RABBIT_ADDRESS=queue_middleware
-      - INPUT_QUEUE_NAME=vault-input
-    ports:
-      - 9000:9000
-    volumes: &appvolumes
+    volumes: &coordinator-volumes
       - ./state.txt:/app/state.txt
       - .:/app
       - /var/run/docker.sock:/var/run/docker.sock
-        - ./storage/app1:/storage
     entrypoint: python3 main.py
     networks:
-      - bully-example
+      - stack-overflow-analysis
 
-  app2:
-    container_name: app2
+  coordinator-2:
+    container_name: coordinator_2
     build: .
     env_file:
-      - .env
+      - coordinator.env
     environment:
-      - LEADER_ADDRESS=app1
-      - PYTHONHASHSEED=0
-      - PYTHONUNBUFFERED=1
       - NODE_ID=2
-      - LISTEN_PORT=9001
-      - PEERS_INFO=1-app1:9000,3-app3:9002
-      - STORAGE_PATH=/storage
-      - STORAGE_BUCKETS_NUMBER=20
-      - RETRY_WAIT=0.5
-      - RABBIT_ADDRESS=queue_middleware
-      - INPUT_QUEUE_NAME=vault-input
-    volumes: *appvolumes
-    command: ["./wait-for", "app1:9000", "--", "python", "main.py"]
+    volumes: *coordinator-volumes
+    command: ["./wait-for", "coordinator-1:9000", "--", "python", "main.py"]
     networks:
-      - bully-example
+      - stack-overflow-analysis
 
-  app3:
-    container_name: app3
+  coordinator-3:
+    container_name: coordinator_3
     build: .
     env_file:
-      - .env
+      - coordinator.env
     environment:
-      - LEADER_ADDRESS=app1
-      - PYTHONUNBUFFERED=1
-      - PYTHONHASHSEED=0
       - NODE_ID=3
-      - LISTEN_PORT=9002
-      - PEERS_INFO=1-app1:9000,2-app2:9001
-      - STORAGE_PATH=/storage
-      - RETRY_WAIT=0.5
-      - RABBIT_ADDRESS=queue_middleware
-      - STORAGE_BUCKETS_NUMBER=20
-      - INPUT_QUEUE_NAME=vault-input
-    command: ["./wait-for", "app2:9001", "--", "python", "main.py"]
-    volumes: *appvolumes
+    command: ["./wait-for", "coordinator-3:9000", "--", "python", "main.py"]
+    volumes: *coordinator-volumes
     networks:
-      - bully-example
+      - stack-overflow-analysis
 
-  vault_client:
-    container_name: vault_client
-    image: bully-example:latest
+  vault-1:
+    container_name: vault_1
+    build: .
+    env_file:
+      - vault.env
     environment:
-      - PYTHONUNBUFFERED=1
-      - RABBIT_ADDRESS=queue_middleware
-      - INPUT_QUEUE_NAME=vault-input
-    command: ["./wait-for", "app1:9000", "--", "python", "vault_client.py"]
+      - NODE_ID=1
+      - LEADER=True
+    entrypoint: python3 main-vault.py
+    volumes: &vault-volumes
+      - .:/app
+      - ./storage/vault-1:/storage
     networks:
-      - bully-example
+      - stack-overflow-analysis
 
+  vault-2:
+    container_name: vault_2
+    build: .
+    env_file:
+      - vault.env
+    environment:
+      - NODE_ID=2
+    command: ["./wait-for", "vault-1:9000", "--", "python", "main-vault.py"]
+    volumes:
+      - .:/app
+      - ./storage/vault-2:/storage
+    networks:
+      - stack-overflow-analysis
+
+  vault-3:
+    container_name: vault_3
+    build: .
+    env_file:
+      - vault.env
+    environment:
+      - NODE_ID=2
+    command: ["./wait-for", "vault-2:9000", "--", "python", "main-vault.py"]
+    volumes:
+      - .:/app
+      - ./storage/vault-3:/storage
+    networks:
+      - stack-overflow-analysis
 
   heartbeat_1:
     build: .
     env_file:
-      - .env
-    volumes: &heartbeat_volumes
+      - coordinator.env
+    volumes: &heartbeat-volumes
       - .:/app
     entrypoint: python3 heartbeat/main.py
     networks:
-      - bully-example
-
+      - stack-overflow-analysis
 
   heartbeat_2:
     build: .
     env_file:
-      - .env
-    volumes: *heartbeat_volumes
+      - coordinator.env
+    volumes: *heartbeat-volumes
     entrypoint: python3 heartbeat/main.py
     networks:
-      - bully-example
+      - stack-overflow-analysis
 
   heartbeat_3:
     build: .
     env_file:
-      - .env
-    volumes: *heartbeat_volumes
+      - coordinator.env
+    volumes: *heartbeat-volumes
     entrypoint: python3 heartbeat/main.py
     networks:
-      - bully-example
+      - stack-overflow-analysis
 
   heartbeat_4:
     build: .
     env_file:
-      - .env
-    volumes: *heartbeat_volumes
+      - coordinator.env
+    volumes: *heartbeat-volumes
     entrypoint: python3 heartbeat/main.py
     networks:
-      - bully-example
-
-
+      - stack-overflow-analysis
 
 
 networks:
-  bully-example:
+  stack-overflow-analysis:
     ipam:
       driver: default
       config:
