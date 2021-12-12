@@ -3,3 +3,7 @@ venv
 storage
 
 __pycache__
+
+*.pyc
+
+state.txt

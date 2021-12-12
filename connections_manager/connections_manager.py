@@ -16,7 +16,8 @@ class ConnectionsManager:
             id, addr = c.split('-', 1)
             host, port = addr.split(':', 1)
             self.addresses.append(addr)
-            self.connections.append(PeerConnection(host, port, id))
+            if id != node_id:
+                self.connections.append(PeerConnection(host, port, id))
 
         # Open Listening process
         self.t1 = Thread(target=self._init_listening_port)

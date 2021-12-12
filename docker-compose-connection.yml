@@ -5,12 +5,12 @@ services:
     image: bully-example:latest
     environment:
       - PYTHONUNBUFFERED=1
-      - LISTEN_PORT=9000
       - NODE_ID=1
+      - LISTEN_PORT=9000
       - PEERS_INFO=2-app2:9001,3-app3:9002
     ports:
       - 9000:9000
-    entrypoint: python3 test_bully.py
+    entrypoint: python3 main.py
     networks:
       - bully-example
   
@@ -19,10 +19,10 @@ services:
     image: bully-example:latest
     environment:
       - PYTHONUNBUFFERED=1
-      - LISTEN_PORT=9001
       - NODE_ID=2
+      - LISTEN_PORT=9001
       - PEERS_INFO=1-app1:9000,3-app3:9002
-    command: ["./wait-for", "app1:9000", "--", "python", "test_bully.py"]
+    command: ["./wait-for", "app1:9000", "--", "python", "main.py"]
     networks:
       - bully-example
   
@@ -31,10 +31,10 @@ services:
     image: bully-example:latest
     environment:
       - PYTHONUNBUFFERED=1
-      - LISTEN_PORT=9002
       - NODE_ID=3
+      - LISTEN_PORT=9002
       - PEERS_INFO=1-app1:9000,2-app2:9001
-    command: ["./wait-for", "app2:9001", "--", "python", "test_bully.py"]
+    command: ["./wait-for", "app2:9001", "--", "python", "main.py"]
     networks:
       - bully-example
 

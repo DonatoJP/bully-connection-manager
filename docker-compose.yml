@@ -12,7 +12,9 @@ services:
 
   app1:
     container_name: app1
-    image: bully-example:latest
+    build: .
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONHASHSEED=0
@@ -27,15 +29,20 @@ services:
       - INPUT_QUEUE_NAME=vault-input
     ports:
       - 9000:9000
+    volumes: &appvolumes
+      - ./state.txt:/app/state.txt
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+        - ./storage/app1:/storage
     entrypoint: python3 main.py
     networks:
       - bully-example
-    volumes:
-        - ./storage/app1:/storage
 
   app2:
     container_name: app2
-    image: bully-example:latest
+    build: .
+    env_file:
+      - .env
     environment:
       - LEADER_ADDRESS=app1
       - PYTHONHASHSEED=0
@@ -48,15 +55,16 @@ services:
       - RETRY_WAIT=0.5
       - RABBIT_ADDRESS=queue_middleware
       - INPUT_QUEUE_NAME=vault-input
+    volumes: *appvolumes
     command: ["./wait-for", "app1:9000", "--", "python", "main.py"]
     networks:
       - bully-example
-    volumes:
-        - ./storage/app2:/storage
 
   app3:
     container_name: app3
-    image: bully-example:latest
+    build: .
+    env_file:
+      - .env
     environment:
       - LEADER_ADDRESS=app1
       - PYTHONUNBUFFERED=1
@@ -70,10 +78,9 @@ services:
       - STORAGE_BUCKETS_NUMBER=20
       - INPUT_QUEUE_NAME=vault-input
     command: ["./wait-for", "app2:9001", "--", "python", "main.py"]
+    volumes: *appvolumes
     networks:
       - bully-example
-    volumes:
-        - ./storage/app3:/storage
 
   vault_client:
     container_name: vault_client
@@ -85,6 +92,48 @@ services:
     command: ["./wait-for", "app1:9000", "--", "python", "vault_client.py"]
     networks:
       - bully-example
+
+
+  heartbeat_1:
+    build: .
+    env_file:
+      - .env
+    volumes: &heartbeat_volumes
+      - .:/app
+    entrypoint: python3 heartbeat/main.py
+    networks:
+      - bully-example
+
+
+  heartbeat_2:
+    build: .
+    env_file:
+      - .env
+    volumes: *heartbeat_volumes
+    entrypoint: python3 heartbeat/main.py
+    networks:
+      - bully-example
+
+  heartbeat_3:
+    build: .
+    env_file:
+      - .env
+    volumes: *heartbeat_volumes
+    entrypoint: python3 heartbeat/main.py
+    networks:
+      - bully-example
+
+  heartbeat_4:
+    build: .
+    env_file:
+      - .env
+    volumes: *heartbeat_volumes
+    entrypoint: python3 heartbeat/main.py
+    networks:
+      - bully-example
+
+
+
 
 networks:
   bully-example:

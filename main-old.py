@@ -1,14 +1,6 @@
 from multiprocessing import process
-from bully import Bully, Event
 from connections_manager import ConnectionsManager
-import os, signal, sys, time, socket
-
-def new_leader_callback():
-    print('CALLBACK: NEW_LEADER')
-
-def election_callback():
-    print('CALLBACK: ELECTION_STARTED')
-
+import os, signal, sys, time
 
 def main():
     port_n = os.environ['LISTEN_PORT']
@@ -25,16 +17,15 @@ def main():
     signal.signal(signal.SIGTERM, __exit_gracefully)
 
     time.sleep(5)
-    peer_hostnames = list(map(lambda x: x.split(':')[0].split('-')[1], peer_addrs))
-    bully = Bully(cm, peer_hostnames)
-
-    bully.set_callback(Event.NEW_LEADER, new_leader_callback)
-    bully.set_callback(Event.ELECTION_STARTED, election_callback)
-
-    bully.begin_election_process()
-
+    cm.send_to_all(f'Hola 1 desde {port_n} !!')
+    cm.send_to_all(f'Hola 2 desde {port_n} !!')
+    for peer in peer_addrs:
+        peer_addr = peer.split(':')[0].split('-')[1]
+        received = cm.recv_from(peer_addr)
+        print(f'Received from {peer_addr}: {received}')
+        received = cm.recv_from(peer_addr)
+        print(f'Received from {peer_addr}: {received}')
     cm._join_listen_thread()
-
 
 if __name__ == '__main__':
     main()
