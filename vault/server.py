@@ -6,26 +6,23 @@ import pika
 
 
 class RabbitMessageProcessor:
-    def set_rabbit_channel(self, channel, queue_name):
-        self.channel = channel
-        self.queue_name = queue_name
-
     def process(self, message):
         return message
 
     def __call__(self, ch, method, properties, body):
         message = body.decode()
-        result = self.process(message)
-        if result is not None:
-            self.channel.basic_publish(
-                exchange='', routing_key=self.queue_name, body=result.encode())
+        queue, result = self.process(message)
+        if result is not None and queue is not None:
+            ch.basic_publish(
+                exchange='', routing_key=queue, body=result.encode())
+
+        ch.basic_ack(method.delivery_tag)
 
 
 class RabbitConsumerServer:
-    def __init__(self, rabbit_addr, input_queue_name, output_queue_name, message_processor):
+    def __init__(self, rabbit_addr, input_queue_name, message_processor):
         self.connection_parameters = pika.ConnectionParameters(rabbit_addr)
         self.input_queue_name = input_queue_name
-        self.output_queue_name = output_queue_name
         self.message_processor = message_processor
 
     def start(self):
@@ -33,10 +30,8 @@ class RabbitConsumerServer:
         self.channel = connection.channel()
 
         self.channel.queue_declare(queue=self.input_queue_name)
-        self.channel.queue_declare(queue=self.output_queue_name)
 
-        self.message_processor.set_rabbit_channel(
-            self.channel, self.output_queue_name)
+        logging.info(self.input_queue_name)
 
         self.channel.basic_consume(queue=self.input_queue_name,
                                    on_message_callback=self.message_processor)
@@ -50,8 +45,6 @@ class RabbitConsumerServer:
         logging.info('Waiting for messages from rabbit. To exit press CTRL+C')
         self.channel.start_consuming()
 
-        self.channel.start_consuming()
-
         logging.info('Server stopped')
 
         self.channel.close()
@@ -61,6 +54,7 @@ class RabbitConsumerServer:
 
     def _connect_to_rabbit(self):
         retries = 5
+        logging.info(f"Connecting to Rabbit at {self.connection_parameters}")
         while True:
             try:
                 return pika.BlockingConnection(self.connection_parameters)

@@ -16,12 +16,15 @@ class VaultMessageProcessor(RabbitMessageProcessor):
 
     def process(self, message):
         op, params = message.split(" ", 1)
+
         if op == "GET":
-            return self._get(params)
+            queue, key = params.split(" ", 1)
+            return queue, self._get(key)
 
         if op == "POST":
             key, value = params.split("=", 1)
-            return self._post(key, value)
+            self._post(key, value)
+            return None, None
 
     def _get(self, key):
         retry, value = self.vault.leader_get(key)
@@ -35,12 +38,32 @@ class VaultMessageProcessor(RabbitMessageProcessor):
         retry = self.vault.leader_post(key, value)
         while retry:
             time.sleep(self.retry_wait)
-            retry = self.vault.leader_get(key)
+            retry = self.vault.leader_post(key, value)
 
-        return "OK"
+
+def leader_start(vault: Vault):
+    retry_wait = float(os.environ['RETRY_WAIT'])
+
+    message_processor = VaultMessageProcessor(vault, retry_wait)
+
+    rabbit_adress = os.environ['RABBIT_ADDRESS']
+    input_queue_name = os.environ['INPUT_QUEUE_NAME']
+
+    server = RabbitConsumerServer(
+        rabbit_adress, input_queue_name, message_processor)
+
+    server.start()
+
+
+def follower_start(vault: Vault):
+    leader_address = os.environ['LEADER_ADDRESS']
+    vault.set_leader_addr(leader_address)
+    vault.follower_listen()
 
 
 def main():
+    logging.basicConfig(level="INFO")
+
     port_n = os.environ['LISTEN_PORT']
     peer_addrs = os.environ['PEERS_INFO'].split(',')
     node_id = os.environ['NODE_ID']
@@ -58,26 +81,16 @@ def main():
     logging.info("Waiting for initialization...")
     time.sleep(5)
 
-    print("Initialization finished!")
+    logging.info("Initialization finished!")
 
     storage_path = os.environ['STORAGE_PATH']
-    storage_buckets_number = os.environ['STORAGE_BUCKETS_NUMBER']
+    storage_buckets_number = int(os.environ['STORAGE_BUCKETS_NUMBER'])
 
     vault = Vault(cluster, storage_path, storage_buckets_number)
 
-    retry_wait = os.environ['RETRY_WAIT']
+    ia_am_leader = os.environ.get('LEADER', False)
 
-    message_processor = VaultMessageProcessor(vault, retry_wait)
-
-    rabbit_adress = os.environ['RABBIT_ADDRES']
-    input_queue_name = os.environ['INPUT_QUEUE_NAME']
-    output_queue_name = os.environ['OUTPUT_QUEUE_NAME']
-
-    server = RabbitConsumerServer(
-        rabbit_adress, input_queue_name, output_queue_name, message_processor)
-
-    server.start()
-
-
-if __name__ == '__main__':
-    main()
+    if ia_am_leader:
+        leader_start(vault)
+    else:
+        follower_start(vault)

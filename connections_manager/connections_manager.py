@@ -10,12 +10,13 @@ class ConnectionsManager:
         self.node_id = int(node_id)
         self.port_n = int(self_port_n)
         self.listener_stream = None
-        self.addresses = connections_to_create
+        self.addresses = []
 
         for c in connections_to_create:
-            id_addr, port = c.split(':')
-            id, addr = id_addr.split('-')
-            self.connections.append(PeerConnection(addr, port, id))
+            id, addr = c.split('-', 1)
+            host, port = addr.split(':', 1)
+            self.addresses.append(addr)
+            self.connections.append(PeerConnection(host, port, id))
 
         # Open Listening process
         self.t1 = Thread(target=self._init_listening_port)
@@ -43,7 +44,8 @@ class ConnectionsManager:
         stream.bind(('0.0.0.0', self.port_n))
         stream.listen()
         self.listener_stream = stream
-        print(f'[Node {self.node_id} Listener Thread] Begin listening in {self.port_n}')
+        print(
+            f'[Node {self.node_id} Listener Thread] Begin listening in {self.port_n}')
         while True:
             conn, client_addr = stream.accept()
             peer_connection = self._find_peer(client_addr[0])
@@ -78,7 +80,8 @@ class ConnectionsManager:
 
     def send_to_higher(self, message: str):
         # TODO: Change port_n to conn_id
-        higher_peers = filter(lambda pc: pc.is_higher(self.node_id) , self.connections)
+        higher_peers = filter(lambda pc: pc.is_higher(
+            self.node_id), self.connections)
 
         for mp in higher_peers:
             mp.send_message(message)

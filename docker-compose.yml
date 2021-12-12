@@ -1,5 +1,15 @@
 version: '3.8'
+
 services:
+  queue_middleware:
+    container_name: queue_middleware
+    image: rabbitmq:management
+    restart: unless-stopped
+    ports:
+        - 15672:15672
+    networks:
+      - bully-example
+
   app1:
     container_name: app1
     image: bully-example:latest
@@ -7,10 +17,14 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONHASHSEED=0
       - LISTEN_PORT=9000
-      - PEER_ADDRESS=app2:9001,app3:9002
       - LEADER=True
       - NODE_ID=1
       - PEERS_INFO=2-app2:9001,3-app3:9002
+      - STORAGE_PATH=/storage
+      - STORAGE_BUCKETS_NUMBER=20
+      - RETRY_WAIT=0.5
+      - RABBIT_ADDRESS=queue_middleware
+      - INPUT_QUEUE_NAME=vault-input
     ports:
       - 9000:9000
     entrypoint: python3 main.py
@@ -29,6 +43,11 @@ services:
       - NODE_ID=2
       - LISTEN_PORT=9001
       - PEERS_INFO=1-app1:9000,3-app3:9002
+      - STORAGE_PATH=/storage
+      - STORAGE_BUCKETS_NUMBER=20
+      - RETRY_WAIT=0.5
+      - RABBIT_ADDRESS=queue_middleware
+      - INPUT_QUEUE_NAME=vault-input
     command: ["./wait-for", "app1:9000", "--", "python", "main.py"]
     networks:
       - bully-example
@@ -45,11 +64,27 @@ services:
       - NODE_ID=3
       - LISTEN_PORT=9002
       - PEERS_INFO=1-app1:9000,2-app2:9001
+      - STORAGE_PATH=/storage
+      - RETRY_WAIT=0.5
+      - RABBIT_ADDRESS=queue_middleware
+      - STORAGE_BUCKETS_NUMBER=20
+      - INPUT_QUEUE_NAME=vault-input
     command: ["./wait-for", "app2:9001", "--", "python", "main.py"]
     networks:
       - bully-example
     volumes:
         - ./storage/app3:/storage
+
+  vault_client:
+    container_name: vault_client
+    image: bully-example:latest
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBIT_ADDRESS=queue_middleware
+      - INPUT_QUEUE_NAME=vault-input
+    command: ["./wait-for", "app1:9000", "--", "python", "vault_client.py"]
+    networks:
+      - bully-example
 
 networks:
   bully-example:
