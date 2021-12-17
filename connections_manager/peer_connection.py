@@ -1,6 +1,8 @@
 import socket
 from .conn_errors import PeerDownError
 from threading import Condition, Lock
+
+
 class PeerConnection:
     def __init__(self, addr, port, node_id) -> None:
         self.peer_addr = addr
@@ -40,7 +42,6 @@ class PeerConnection:
         self.peer_conn_cv.notify_all()
         self.peer_conn_cv.release()
 
-
     def shutdown(self):
         if self.peer_conn:
             self.peer_conn.close()
@@ -75,9 +76,9 @@ class PeerConnection:
             self.peer_conn_cv.wait_for(self.perr_conn_is_valid, None)
             self.peer_conn_cv.release()
             return self.recv_message()
-        
+
         return msg.decode('utf-8')
-    
+
     def perr_conn_is_valid(self):
         return self.peer_conn is not None and self.peer_conn.fileno() != -1
 

@@ -36,12 +36,6 @@ class RabbitConsumerServer:
         self.channel.basic_consume(queue=self.input_queue_name,
                                    on_message_callback=self.message_processor)
 
-        def stop_signal_handler(*args):
-            self.stop()
-
-        signal.signal(signal.SIGTERM, stop_signal_handler)
-        signal.signal(signal.SIGINT, stop_signal_handler)
-
         logging.info('Waiting for messages from rabbit. To exit press CTRL+C')
         self.channel.start_consuming()
 

@@ -49,8 +49,7 @@ def main():
         print(message)
         channel.basic_publish("", input_queue_name, message)
 
-        method_frame, properties, body = next(channel.consume(
-            res_queue_name))
+        method_frame, properties, body = next(channel.consume(res_queue_name))
 
         print(body.decode())
         print(pickle.loads(bytes.fromhex(body.decode())))

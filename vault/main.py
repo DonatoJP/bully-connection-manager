@@ -2,6 +2,7 @@ import os
 import logging
 import signal
 import time
+from threading import Condition, Lock
 
 from connections_manager import ConnectionsManager
 from bully import Bully, Event
@@ -42,23 +43,35 @@ class VaultMessageProcessor(RabbitMessageProcessor):
             retry = self.vault.leader_post(key, value)
 
 
-def leader_start(vault: Vault):
-    retry_wait = float(os.environ['RETRY_WAIT'])
+def leader_start(server: RabbitConsumerServer):
+    signal_exited = [False]
 
-    message_processor = VaultMessageProcessor(vault, retry_wait)
+    def stop_signal_handler(*args):
+        signal_exited[0] = True
+        server.stop()
 
-    rabbit_adress = os.environ['RABBIT_ADDRESS']
-    input_queue_name = os.environ['INPUT_QUEUE_NAME']
-
-    server = RabbitConsumerServer(
-        rabbit_adress, input_queue_name, message_processor)
+    signal.signal(signal.SIGTERM, stop_signal_handler)
+    signal.signal(signal.SIGINT, stop_signal_handler)
 
     server.start()
 
+    return signal_exited[0]
+
 
 def follower_start(vault: Vault, leader_addr):
+    signal_exited = [False]
+
+    def stop_signal_handler(*args):
+        signal_exited[0] = True
+        vault.follower_stop()
+
+    signal.signal(signal.SIGTERM, stop_signal_handler)
+    signal.signal(signal.SIGINT, stop_signal_handler)
+
     vault.set_leader_addr(leader_addr)
     vault.follower_listen()
+
+    return signal_exited[0]
 
 
 def main():
@@ -98,13 +111,52 @@ def main():
                       for addr in bully_peers]
     bully = Bully(bully_cm, peer_hostnames)
 
+    retry_wait = float(os.environ['RETRY_WAIT'])
+
+    message_processor = VaultMessageProcessor(vault, retry_wait)
+
+    rabbit_adress = os.environ['RABBIT_ADDRESS']
+    input_queue_name = os.environ['INPUT_QUEUE_NAME']
+
+    server = RabbitConsumerServer(
+        rabbit_adress, input_queue_name, message_processor)
+
+    i_am_leader = [False]
+
+    started = [False]
+    started_cv = Condition(Lock())
+
     def new_leader_callback():
-        if bully.get_is_leader():
-            leader_start(vault)
+        print("CALLBACK")
+        if i_am_leader[0]:
+            server.stop()
         else:
-            leader_addr = bully.get_leader_addr()
-            follower_start(vault, leader_addr)
+            vault.follower_stop()
+
+        started_cv.acquire()
+        started[0] = True
+        started_cv.notify_all()
+        started_cv.release()
 
     bully.set_callback(Event.NEW_LEADER, new_leader_callback)
 
     bully.begin_election_process()
+
+    started_cv.acquire()
+    started_cv.wait_for(lambda: started[0])
+    started_cv.release()
+
+    exited = False
+    while not exited:
+        i_am_leader[0] = bully.get_is_leader()
+        if i_am_leader[0]:
+            exited = leader_start(server)
+        else:
+            leader_addr = bully.get_leader_addr()
+            exited = follower_start(vault, leader_addr)
+
+    for thread in bully.threads:
+        thread.join()
+
+    vault_cm._join_listen_thread()
+    bully_cm._join_listen_thread()

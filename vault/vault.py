@@ -1,3 +1,4 @@
+import logging
 from math import ceil
 from multiprocessing.pool import ThreadPool
 from threading import Lock
@@ -13,7 +14,8 @@ class Vault:
         self.cluster = cluster
         self.pool = ThreadPool(len(cluster.connections))
         self.storage = Storage(storage_path, buckets_number)
-        self.leader_addr_lock = Lock()
+        self.follower_keep_listening = True
+        self.follower_lock = Lock()
         self.cluster_quorum = ceil(len(self.cluster.connections) / 2)
 
     def validate_key(self, key):
@@ -31,18 +33,25 @@ class Vault:
             raise ValueError("value contains illegal characters")
 
     def set_leader_addr(self, leader_addr):
-        with self.leader_addr_lock:
+        with self.follower_lock:
             self.leader_addr = leader_addr
 
     def follower_listen(self):
-        while True:
+        with self.follower_lock:
+            self.follower_keep_listening = True
+
+        logging.info("Waiting for messages from leader")
+        while self.follower_keep_listening:
             # Solo se puede cambiar el leader cuando no hay una operacion siendo procesada
-            with self.leader_addr_lock:
+            with self.follower_lock:
 
                 # Necesitamos un timeout para que cada tanto salga del recv_from y pueda cambiar de leader
+                logging.info("Waiting for new message from leader")
                 message = self.cluster.recv_from(self.leader_addr)
                 if message is None:
                     continue
+
+                logging.info(f"Got message {message} from leader")
 
                 # Se podria optimizar esto con una pool de workers?
                 op, params = message.split(" ", 1)
@@ -60,6 +69,10 @@ class Vault:
                 except:
                     # Leader down, abort operation
                     pass
+
+    def follower_stop(self):
+        with self.follower_lock:
+            self.follower_keep_listening = False
 
     def _follower_get(self, key):
         res = self.storage.get(key)
