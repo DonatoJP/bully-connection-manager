@@ -246,7 +246,12 @@ class Bully:
         print(f'Starting to receive from {peer_addr}')
         while True:
             msg = self.conn_manager.recv_from(peer_addr)
-            if msg == 'ELECTION':
+            if msg is None:
+                print(f'Waiting until {peer_addr} is back again')
+                self.conn_manager.wait_until_back_again(peer_addr)
+                print(f'{peer_addr} is back again. The show must go on!')
+                continue
+            elif msg == 'ELECTION':
                 self._process_election_message(peer_addr)
             elif msg == 'OK':
                 self._process_ok_message(peer_addr)
@@ -266,6 +271,5 @@ class Bully:
             Event.LEADER_DOWN
         """
         self.callbacks[event] = callback
-
 
         

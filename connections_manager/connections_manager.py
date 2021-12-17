@@ -2,8 +2,6 @@ import socket
 from threading import Thread
 from .peer_connection import PeerConnection
 from typing import Optional
-
-
 class ConnectionsManager:
     def __init__(self, node_id: str, self_port_n: str, connections_to_create: list):
         self.connections: list[PeerConnection] = []
@@ -82,3 +80,10 @@ class ConnectionsManager:
 
         for mp in higher_peers:
             mp.send_message(message)
+    
+    def wait_until_back_again(self, peer_addr):
+        peer = self._find_peer(peer_addr)
+        if peer is None:
+            raise Exception('Invalid peer address')
+        
+        return peer._wait_until_back_again()
