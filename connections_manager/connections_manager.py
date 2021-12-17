@@ -5,7 +5,7 @@ from typing import Optional
 
 
 class ConnectionsManager:
-    def __init__(self, node_id: str, self_port_n: str, connections_to_create: list):
+    def __init__(self, node_id: str, self_port_n: str, connections_to_create: list, timeout=None):
         self.connections: list[PeerConnection] = []
         self.node_id = int(node_id)
         self.port_n = int(self_port_n)
@@ -17,7 +17,8 @@ class ConnectionsManager:
             host, port = addr.split(':', 1)
             self.addresses.append(addr)
             if id != node_id:
-                self.connections.append(PeerConnection(host, port, id))
+                self.connections.append(
+                    PeerConnection(host, port, id, timeout))
 
         # Open Listening process
         self.t1 = Thread(target=self._init_listening_port)

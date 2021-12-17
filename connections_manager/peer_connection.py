@@ -1,13 +1,15 @@
+import logging
 import socket
 from .conn_errors import PeerDownError
 from threading import Condition, Lock
 
 
 class PeerConnection:
-    def __init__(self, addr, port, node_id) -> None:
+    def __init__(self, addr, port, node_id, timeout=None) -> None:
         self.peer_addr = addr
         self.peer_port = int(port)
         self.node_id = int(node_id)
+        self.timeout = timeout
 
         self.peer_conn = None
         self.peer_conn_cv = Condition(Lock())
@@ -30,7 +32,7 @@ class PeerConnection:
     def is_higher(self, peer_id: int):
         return self.node_id > peer_id
 
-    def set_connection(self, conn):
+    def set_connection(self, conn: socket.socket):
         self.peer_conn_cv.acquire()
 
         # Closing latest connection
@@ -38,6 +40,7 @@ class PeerConnection:
             self.peer_conn.close()
 
         self.peer_conn = conn
+        self.peer_conn.settimeout(self.timeout)
         print(f'Setting new connection: {conn}')
         self.peer_conn_cv.notify_all()
         self.peer_conn_cv.release()
@@ -70,12 +73,15 @@ class PeerConnection:
 
             # Receive Final Message
             msg = self._recv(int.from_bytes(msg_len, byteorder='big'))
+        except socket.timeout:
+            return None
         except OSError as e:
-            print('Connection closed?')
-            self.peer_conn_cv.acquire()
-            self.peer_conn_cv.wait_for(self.perr_conn_is_valid, None)
-            self.peer_conn_cv.release()
-            return self.recv_message()
+            logging.info('Connection closed?')
+            # self.peer_conn_cv.acquire()
+            # self.peer_conn_cv.wait_for(self.perr_conn_is_valid, None)
+            # self.peer_conn_cv.release()
+            # return self.recv_message()
+            return None
 
         return msg.decode('utf-8')
 
@@ -97,6 +103,7 @@ class PeerConnection:
         received = b''
         bytes_read = 0
         while True:
+            logging.info("Re loco")
             received += self.peer_conn.recv(to_receive - bytes_read)
             bytes_read += len(received)
             result += received

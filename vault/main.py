@@ -83,7 +83,9 @@ def main():
     vault_peers = [addr for addr in os.environ['VAULT_PEERS_INFO'].split(
         ',') if not addr.startswith(f"{node_id}-")]
     vault_port = os.environ['VAULT_LISTEN_PORT']
-    vault_cm = ConnectionsManager(node_id, vault_port, vault_peers)
+    vault_timeout = int(os.environ['VAULT_TIMEOUT'])
+    vault_cm = ConnectionsManager(
+        node_id, vault_port, vault_peers, vault_timeout)
 
     bully_peers = [addr for addr in os.environ['BULLY_PEERS_INFO'].split(
         ',') if not addr.startswith(f"{node_id}-")]
@@ -154,6 +156,7 @@ def main():
         else:
             leader_addr = bully.get_leader_addr()
             exited = follower_start(vault, leader_addr)
+            logging.info(f"Follower finished: {exited}")
 
     for thread in bully.threads:
         thread.join()

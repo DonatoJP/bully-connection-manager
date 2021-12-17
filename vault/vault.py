@@ -49,7 +49,12 @@ class Vault:
                 logging.info("Waiting for new message from leader")
                 message = self.cluster.recv_from(self.leader_addr)
                 if message is None:
-                    continue
+                    if self.follower_keep_listening:
+                        logging.info("Follower continueing")
+                        continue
+                    else:
+                        logging.info("Follower exiting")
+                        break
 
                 logging.info(f"Got message {message} from leader")
 
@@ -70,8 +75,12 @@ class Vault:
                     # Leader down, abort operation
                     pass
 
+        logging.info("Follower quiting")
+
     def follower_stop(self):
+        logging.info("Stopping follower proc")
         with self.follower_lock:
+            logging.info("Follower lock acquired")
             self.follower_keep_listening = False
 
     def _follower_get(self, key):
