@@ -1,5 +1,5 @@
 import socket, logging
-from threading import Thread
+from threading import Condition, Lock, Thread
 from .peer_connection import PeerConnection
 from typing import Optional
 class ConnectionsManager:
@@ -9,6 +9,9 @@ class ConnectionsManager:
         self.port_n = int(self_port_n)
         self.listener_stream = None
         self.addresses = connections_to_create
+
+        self.all_connected = False
+        self.all_connected_cv = Condition(Lock())
 
         for c in connections_to_create:
             id_addr, port = c.split(':')
@@ -23,6 +26,11 @@ class ConnectionsManager:
         # Begin Connections with active peers
         self._init_peer_connections()
 
+        self.all_connected_cv.acquire()
+        self.all_connected_cv.wait_for(self._all_peers_are_connected)
+        self.all_connected_cv.release()
+        
+
     def _join_listen_thread(self):
         self.t1.join()
 
@@ -35,6 +43,10 @@ class ConnectionsManager:
     def _init_peer_connections(self):
         for peer_connection in self.connections:
             peer_connection.init_connection()
+        
+        self.all_connected_cv.acquire()
+        self.all_connected_cv.notify_all()
+        self.all_connected_cv.release()
 
     def _init_listening_port(self):
         stream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -52,6 +64,13 @@ class ConnectionsManager:
             logging.info(
                 f'[Node {self.node_id} Listener Thread] Incoming connection request from {socket.gethostbyaddr(client_addr[0])[0].split(".")[0]}')
             peer_connection.set_connection(conn)
+            self.all_connected_cv.acquire()
+            self.all_connected_cv.notify_all()
+            self.all_connected_cv.release()
+
+    def _all_peers_are_connected(self):
+        print("Are all peers connected?", all([ peer.is_connected() for peer in self.connections]))
+        return all([ peer.is_connected() for peer in self.connections])
 
     def _find_peer(self, peer_addr) -> Optional[PeerConnection]:
         return next((x for x in self.connections if x.is_peer(peer_addr)), None)
