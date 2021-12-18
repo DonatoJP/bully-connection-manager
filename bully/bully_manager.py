@@ -50,3 +50,7 @@ class BullyManager(Thread):
     def begin_election_process(self):
         self._wait_until_bully_is_ready()
         self.bully.begin_election_process()
+    
+    def get_is_leader(self):
+        self._wait_until_bully_is_ready()
+        self.bully.get_is_leader()
