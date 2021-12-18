@@ -130,15 +130,16 @@ def main():
 
     def new_leader_callback():
         print("CALLBACK")
-        if i_am_leader[0]:
-            server.stop()
+        if started[0]:
+            if i_am_leader[0]:
+                server.stop()
+            else:
+                vault.follower_stop()
         else:
-            vault.follower_stop()
-
-        started_cv.acquire()
-        started[0] = True
-        started_cv.notify_all()
-        started_cv.release()
+            started_cv.acquire()
+            started[0] = True
+            started_cv.notify_all()
+            started_cv.release()
 
     bully.set_callback(Event.NEW_LEADER, new_leader_callback)
 

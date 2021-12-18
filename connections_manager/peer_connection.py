@@ -105,7 +105,7 @@ class PeerConnection:
         aux = b''
         bytes_read = 0
         while True:
-            ready = select.select([self.peer_conn], [], [], 2)
+            ready = select.select([self.peer_conn], [], [], self.timeout)
             if ready[0]:
                 aux += self.peer_conn.recv(to_receive - bytes_read)
                 if not aux:

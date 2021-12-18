@@ -42,6 +42,7 @@ class RabbitConsumerServer:
         logging.info('Server stopped')
 
         self.channel.close()
+        connection.close()
 
     def stop(self):
         self.channel.stop_consuming()

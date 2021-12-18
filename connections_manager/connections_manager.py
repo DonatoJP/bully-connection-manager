@@ -72,7 +72,10 @@ class ConnectionsManager:
 
     def send_to_all(self, message):
         for peer in self.connections:
-            peer.send_message(message)
+            try:
+                peer.send_message(message)
+            except BrokenPipeError:
+                pass
 
     def recv_from(self, peer_addr) -> str:
         peer = self._find_peer(peer_addr)
