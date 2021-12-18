@@ -58,7 +58,7 @@ class Bully:
 
                 received_ping_echo = self.wait_get_received_ping_echo(3)
                 if not received_ping_echo:
-                    logging.debug(f'I detect that LEADER is down. Beggining with election process...')
+                    logging.info(f'I detect that LEADER is down. Beggining with election process...')
                     self.begin_election_process()
             else: 
                 self.is_leader_cv.release()
@@ -225,7 +225,7 @@ class Bully:
         self.set_leader_addr(peer_addr)
         self.set_is_leader(False)
 
-        logging.debug(f'My new LEADER is now {peer_addr} !!')
+        logging.info(f'My new LEADER is now {peer_addr} !!')
         self._reset_election_variables()
 
         if Event.NEW_LEADER in self.callbacks:
