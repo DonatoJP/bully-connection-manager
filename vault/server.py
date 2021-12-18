@@ -24,10 +24,11 @@ class RabbitConsumerServer:
         self.connection_parameters = pika.ConnectionParameters(rabbit_addr)
         self.input_queue_name = input_queue_name
         self.message_processor = message_processor
+        self.connection = None
 
     def start(self):
-        connection = self._connect_to_rabbit()
-        self.channel = connection.channel()
+        self.connection = self._connect_to_rabbit()
+        self.channel = self.connection.channel()
 
         self.channel.queue_declare(queue=self.input_queue_name)
 
@@ -37,15 +38,20 @@ class RabbitConsumerServer:
                                    on_message_callback=self.message_processor)
 
         logging.info('Waiting for messages from rabbit. To exit press CTRL+C')
-        self.channel.start_consuming()
+        try:
+            self.channel.start_consuming()
+            logging.info('Server stopped')
 
-        logging.info('Server stopped')
-
-        self.channel.close()
-        connection.close()
+            self.channel.close()
+            self.connection.close()
+        except:
+            print('======================================================================================================================================================================================================================================================================================================')
+            pass
 
     def stop(self):
         self.channel.stop_consuming()
+        # self.channel.close()
+        # self.connection.close()
 
     def _connect_to_rabbit(self):
         retries = 5

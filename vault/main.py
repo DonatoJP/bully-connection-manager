@@ -55,6 +55,7 @@ def leader_start(server: RabbitConsumerServer):
     signal.signal(signal.SIGINT, stop_signal_handler)
 
     server.start()
+    print("Shutting down server process")
 
     return signal_exited[0]
 
@@ -125,18 +126,44 @@ def main():
     started = [False]
     started_cv = Condition(Lock())
 
+    leader_elected = [False]
+    leader_elected_cv = Condition(Lock())
+
     def new_leader_callback():
         print("CALLBACK")
-        if started[0]:
-            if i_am_leader[0]:
-                server.stop()
-            else:
-                vault.follower_stop()
-        else:
+        if not started[0]:
+            # print("Before ACQ started_cv")
             started_cv.acquire()
             started[0] = True
             started_cv.notify_all()
             started_cv.release()
+            # print("After REL started_cv")
+            
+        
+        # if started[0]:
+        #     if i_am_leader[0]:
+        #         server.stop()
+        #     else:
+        #         vault.follower_stop()
+        # else:
+        #     started_cv.acquire()
+        #     started[0] = True
+        #     started_cv.notify_all()
+        #     started_cv.release()
+
+        if i_am_leader[0] and not bully.get_is_leader():
+            logging.info(f'[NODE {node_id}] I was the leader. Now exiting')
+            server.stop()
+        elif not i_am_leader[0]:
+            logging.info(f'[NODE {node_id}] I was follower. follower.stop()')
+            vault.follower_stop()
+        
+        # print("Before ACQ leader_elected_cv")
+        leader_elected_cv.acquire()
+        leader_elected[0] = True
+        leader_elected_cv.notify_all()
+        leader_elected_cv.release()
+        # print("After REL leader_elected_cv")
 
     bully.set_callback(Event.NEW_LEADER, new_leader_callback)
     bully.begin_election_process()
@@ -147,10 +174,18 @@ def main():
 
     exited = False
     while not exited:
+        leader_elected_cv.acquire()
+        leader_elected_cv.wait_for(lambda: leader_elected[0])
+        leader_elected[0] = False
+        leader_elected_cv.release()
+
         i_am_leader[0] = bully.get_is_leader()
         if i_am_leader[0]:
+            logging.info(f"Leader Started: {exited}")
             exited = leader_start(server)
+            logging.info(f"Leader finished: {exited}")
         else:
+            logging.info(f"Follower Started: {exited}")
             leader_addr = bully.get_leader_addr()
             exited = follower_start(vault, leader_addr)
             logging.info(f"Follower finished: {exited}")
@@ -158,5 +193,5 @@ def main():
     # for thread in bully.threads:
     #     thread.join()
 
-    vault_cm._join_listen_thread()
     bully._join_listen_thread()
+    vault_cm._join_listen_thread()

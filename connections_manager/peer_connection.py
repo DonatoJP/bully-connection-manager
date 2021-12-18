@@ -88,6 +88,8 @@ class PeerConnection:
             msg = self._recv(int.from_bytes(msg_len, byteorder='big'))
         except ConnectionClosed as e:
             return None
+        except ConnectionResetError:
+            return None
 
         return msg.decode('utf-8')
 

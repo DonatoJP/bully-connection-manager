@@ -46,11 +46,11 @@ class Vault:
             with self.follower_lock:
 
                 # Necesitamos un timeout para que cada tanto salga del recv_from y pueda cambiar de leader
-                logging.info("Waiting for new message from leader")
+                # logging.info("Waiting for new message from leader")
                 message = self.cluster.recv_from(self.leader_addr)
                 if message is None:
                     if self.follower_keep_listening:
-                        logging.info("Follower continueing")
+                        # logging.info("Follower continueing")
                         continue
                     else:
                         logging.info("Follower exiting")

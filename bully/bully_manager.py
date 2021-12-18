@@ -54,8 +54,8 @@ class BullyManager(Thread):
     
     def get_is_leader(self):
         self._wait_until_bully_is_ready()
-        self.bully.get_is_leader()
+        return self.bully.get_is_leader()
     
     def get_leader_addr(self):
         self._wait_until_bully_is_ready()
-        self.bully.get_leader_addr()
+        return self.bully.get_leader_addr()

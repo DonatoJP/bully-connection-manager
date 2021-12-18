@@ -286,6 +286,8 @@ class Bully:
                 self._process_ready_message(peer_addr)
             elif msg == 'ECHO_READY':
                 self._process_echo_ready_message()
+            
+            print(f"After processing {msg} message")
     
     def _process_ready_message(self, peer_addr):
         self.bully_is_ready_cv.acquire()
