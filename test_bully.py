@@ -1,20 +1,27 @@
 from multiprocessing import process
 from bully import Bully, Event
 from connections_manager import ConnectionsManager
-import os, signal, sys, time, socket
+import os, signal, sys, time, socket, logging
 
 def new_leader_callback():
-    print('CALLBACK: NEW_LEADER')
+    logging.info('CALLBACK: NEW_LEADER')
 
 def election_callback():
-    print('CALLBACK: ELECTION_STARTED')
+    logging.info('CALLBACK: ELECTION_STARTED')
+
+def configure_logger():
+    FORMAT = '%(asctime)s | %(message)s'
+    logging.getLogger().setLevel(logging.INFO)
+    logging.basicConfig(format=FORMAT)
 
 
 def main():
     port_n = os.environ['LISTEN_PORT']
     peer_addrs = os.environ['PEERS_INFO'].split(',')
     node_id = os.environ['NODE_ID']
-    print(f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
+    configure_logger()
+
+    logging.info(f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
     cm = ConnectionsManager(node_id, port_n, peer_addrs)
 
     def __exit_gracefully(*args):

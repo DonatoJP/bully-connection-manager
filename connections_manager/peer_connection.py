@@ -1,5 +1,5 @@
-import socket
-from .conn_errors import PeerDownError
+import socket, select, logging
+from .conn_errors import PeerDownError, ConnectionClosed
 from threading import Condition, Lock
 class PeerConnection:
     def __init__(self, addr, port, node_id) -> None:
@@ -9,6 +9,9 @@ class PeerConnection:
 
         self.peer_conn = None
         self.peer_conn_cv = Condition(Lock())
+
+        self.is_up = True
+        self.is_up_cv = Condition(Lock())
 
     def _is_ip(self, ip):
         try:
@@ -36,9 +39,14 @@ class PeerConnection:
             self.peer_conn.close()
 
         self.peer_conn = conn
-        print(f'Setting new connection: {conn}')
+        logging.info(f'Setting new connection: {conn}')
         self.peer_conn_cv.notify_all()
         self.peer_conn_cv.release()
+
+        self.is_up_cv.acquire()
+        self.is_up = True
+        self.is_up_cv.notify_all()
+        self.is_up_cv.release()
 
 
     def shutdown(self):
@@ -55,10 +63,10 @@ class PeerConnection:
         try:
             conn.connect(peer_host)
             self.set_connection(conn)
-            print(
+            logging.info(
                 f'[Main Thread] Connection to {peer_host} successfully done!')
         except ConnectionRefusedError as e:
-            print(
+            logging.info(
                 f'[Main Thread] Could not connect to {peer_host}. It is not yet active...')
 
     def recv_message(self):
@@ -69,12 +77,8 @@ class PeerConnection:
 
             # Receive Final Message
             msg = self._recv(int.from_bytes(msg_len, byteorder='big'))
-        except OSError as e:
-            print('Connection closed?')
-            self.peer_conn_cv.acquire()
-            self.peer_conn_cv.wait_for(self.perr_conn_is_valid, None)
-            self.peer_conn_cv.release()
-            return self.recv_message()
+        except ConnectionClosed as e:
+            return None
         
         return msg.decode('utf-8')
     
@@ -94,12 +98,29 @@ class PeerConnection:
     def _recv(self, to_receive: int) -> bytes:
         result = b''
         received = b''
+        aux = b''
         bytes_read = 0
         while True:
-            received += self.peer_conn.recv(to_receive - bytes_read)
-            bytes_read += len(received)
-            result += received
-            if bytes_read >= to_receive:
-                break
+            ready = select.select([self.peer_conn], [], [], 2)
+            if ready[0]:
+                aux += self.peer_conn.recv(to_receive - bytes_read)
+                if not aux:
+                    self.is_up_cv.acquire()
+                    self.is_up = False
+                    self.is_up_cv.release()
+                    raise ConnectionClosed()
+                received += aux
+                aux = b''
+                bytes_read += len(received)
+                result += received
+                if bytes_read >= to_receive:
+                    break
 
         return result
+
+    def _wait_until_back_again(self):
+        self.is_up_cv.acquire()
+        self.is_up_cv.wait_for(lambda: self.is_up)
+        self.is_up_cv.release()
+
+        return True
