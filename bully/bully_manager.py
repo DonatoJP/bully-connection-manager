@@ -13,13 +13,12 @@ class BullyManager(Thread):
         self.bully = None
     
     def run(self) -> None:
-        bully_peers = [addr for addr in os.environ['BULLY_PEERS_INFO'].split(
-        ',') if not addr.startswith(f"{self.node_id}-")]
-        print(bully_peers)
-
-        bully_port = os.environ['BULLY_LISTEN_PORT']
-        bully_cm = ConnectionsManager(self.node_id, bully_port, bully_peers)
-        self.bully = Bully(bully_cm, self.peer_hostnames)
+        print(self.peer_hostnames)
+        bully_port = self.port_n
+        
+        bully_cm = ConnectionsManager(self.node_id, bully_port, self.peer_hostnames)
+        bully_peers = list(map(lambda x: x.split(':')[0].split('-')[1], self.peer_hostnames))
+        self.bully = Bully(bully_cm, bully_peers)
 
         return super().run()
     

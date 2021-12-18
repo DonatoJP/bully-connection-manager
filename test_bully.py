@@ -24,6 +24,7 @@ def main():
 
     logging.info(f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
     bully = BullyManager(node_id, peer_addrs, port_n)
+    bully.start()
 
     def __exit_gracefully(*args):
         print("Received SIGTERM signal. Starting graceful exit...")
