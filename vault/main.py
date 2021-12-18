@@ -3,6 +3,7 @@ import logging
 import signal
 import time
 from threading import Condition, Lock
+from bully.bully_manager import BullyManager
 
 from connections_manager import ConnectionsManager
 from bully import Bully, Event
@@ -84,18 +85,20 @@ def main():
         ',') if not addr.startswith(f"{node_id}-")]
     vault_port = os.environ['VAULT_LISTEN_PORT']
     vault_timeout = int(os.environ['VAULT_TIMEOUT'])
+    print("vault_peers", vault_peers)
     vault_cm = ConnectionsManager(
         node_id, vault_port, vault_peers, vault_timeout)
 
-    bully_peers = [addr for addr in os.environ['BULLY_PEERS_INFO'].split(
-        ',') if not addr.startswith(f"{node_id}-")]
-    print(bully_peers)
     bully_port = os.environ['BULLY_LISTEN_PORT']
-    bully_cm = ConnectionsManager(node_id, bully_port, bully_peers)
+    bully_peer_addrs = os.environ['BULLY_PEERS_INFO'].split(',')
+    print("bully_port", bully_port)
+    print("bully_peer_addrs", bully_peer_addrs)
+    bully = BullyManager(node_id, bully_peer_addrs, bully_port)
+    bully.start()
 
     def stop_signal_handler(*args):
         vault_cm.shutdown_connections()
-        bully_cm.shutdown_connections()
+        bully.shutdown_connections()
 
     signal.signal(signal.SIGTERM, stop_signal_handler)
     signal.signal(signal.SIGINT, stop_signal_handler)
@@ -108,10 +111,6 @@ def main():
     storage_path = os.environ['STORAGE_PATH']
     storage_buckets_number = int(os.environ['STORAGE_BUCKETS_NUMBER'])
     vault = Vault(vault_cm, storage_path, storage_buckets_number)
-
-    peer_hostnames = [addr.split("-")[1].split(":")[0]
-                      for addr in bully_peers]
-    bully = Bully(bully_cm, peer_hostnames)
 
     retry_wait = float(os.environ['RETRY_WAIT'])
 
@@ -142,7 +141,6 @@ def main():
             started_cv.release()
 
     bully.set_callback(Event.NEW_LEADER, new_leader_callback)
-
     bully.begin_election_process()
 
     started_cv.acquire()

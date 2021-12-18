@@ -10,46 +10,46 @@ services:
     networks:
       - stack-overflow-analysis
 
-  coordinator-1:
-    container_name: coordinator_1
-    build: .
-    env_file:
-      - coordinator.env
-    environment:
-      - NODE_ID=1
-    volumes: &coordinator-volumes
-      - ./state.txt:/app/state.txt
-      - .:/app
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: main.py
-    networks:
-      - stack-overflow-analysis
+  # coordinator-1:
+  #   container_name: coordinator_1
+  #   build: .
+  #   env_file:
+  #     - coordinator.env
+  #   environment:
+  #     - NODE_ID=1
+  #   volumes: &coordinator-volumes
+  #     - ./state.txt:/app/state.txt
+  #     - .:/app
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   command: main.py
+  #   networks:
+  #     - stack-overflow-analysis
 
-  coordinator-2:
-    container_name: coordinator_2
-    build: .
-    env_file:
-      - coordinator.env
-    environment:
-      - NODE_ID=2
-    volumes: *coordinator-volumes
-    entrypoint: ["./wait-for", "coordinator-1:9000", "--", "python"]
-    command: main.py
-    networks:
-      - stack-overflow-analysis
+  # coordinator-2:
+  #   container_name: coordinator_2
+  #   build: .
+  #   env_file:
+  #     - coordinator.env
+  #   environment:
+  #     - NODE_ID=2
+  #   volumes: *coordinator-volumes
+  #   entrypoint: ["./wait-for", "coordinator-1:9000", "--", "python"]
+  #   command: main.py
+  #   networks:
+  #     - stack-overflow-analysis
 
-  coordinator-3:
-    container_name: coordinator_3
-    build: .
-    env_file:
-      - coordinator.env
-    environment:
-      - NODE_ID=3
-    entrypoint: ["./wait-for", "coordinator-2:9000", "--", "python"]
-    command: main.py
-    volumes: *coordinator-volumes
-    networks:
-      - stack-overflow-analysis
+  # coordinator-3:
+  #   container_name: coordinator_3
+  #   build: .
+  #   env_file:
+  #     - coordinator.env
+  #   environment:
+  #     - NODE_ID=3
+  #   entrypoint: ["./wait-for", "coordinator-2:9000", "--", "python"]
+  #   command: main.py
+  #   volumes: *coordinator-volumes
+  #   networks:
+  #     - stack-overflow-analysis
 
   vault_1:
     container_name: vault_1
@@ -72,7 +72,7 @@ services:
       - vault.env
     environment:
       - NODE_ID=2
-    entrypoint: ["./wait-for", "vault_1:9000", "--", "python"]
+    entrypoint: ["./wait-for", "vault_1:9001", "--", "python"]
     command: main-vault.py
     volumes:
       - .:/app
@@ -87,7 +87,7 @@ services:
       - vault.env
     environment:
       - NODE_ID=3
-    entrypoint: ["./wait-for", "vault_2:9000", "--", "python"]
+    entrypoint: ["./wait-for", "vault_2:9001", "--", "python"]
     command: main-vault.py
     volumes:
       - .:/app
@@ -103,42 +103,42 @@ services:
     networks:
       - stack-overflow-analysis
 
-  heartbeat_1:
-    build: .
-    env_file:
-      - coordinator.env
-    volumes: &heartbeat-volumes
-      - .:/app
-    entrypoint: python3 heartbeat/main.py
-    networks:
-      - stack-overflow-analysis
+  # heartbeat_1:
+  #   build: .
+  #   env_file:
+  #     - coordinator.env
+  #   volumes: &heartbeat-volumes
+  #     - .:/app
+  #   entrypoint: python3 heartbeat/main.py
+  #   networks:
+  #     - stack-overflow-analysis
 
-  heartbeat_2:
-    build: .
-    env_file:
-      - coordinator.env
-    volumes: *heartbeat-volumes
-    entrypoint: python3 heartbeat/main.py
-    networks:
-      - stack-overflow-analysis
+  # heartbeat_2:
+  #   build: .
+  #   env_file:
+  #     - coordinator.env
+  #   volumes: *heartbeat-volumes
+  #   entrypoint: python3 heartbeat/main.py
+  #   networks:
+  #     - stack-overflow-analysis
 
-  heartbeat_3:
-    build: .
-    env_file:
-      - coordinator.env
-    volumes: *heartbeat-volumes
-    entrypoint: python3 heartbeat/main.py
-    networks:
-      - stack-overflow-analysis
+  # heartbeat_3:
+  #   build: .
+  #   env_file:
+  #     - coordinator.env
+  #   volumes: *heartbeat-volumes
+  #   entrypoint: python3 heartbeat/main.py
+  #   networks:
+  #     - stack-overflow-analysis
 
-  heartbeat_4:
-    build: .
-    env_file:
-      - coordinator.env
-    volumes: *heartbeat-volumes
-    entrypoint: python3 heartbeat/main.py
-    networks:
-      - stack-overflow-analysis
+  # heartbeat_4:
+  #   build: .
+  #   env_file:
+  #     - coordinator.env
+  #   volumes: *heartbeat-volumes
+  #   entrypoint: python3 heartbeat/main.py
+  #   networks:
+  #     - stack-overflow-analysis
 
 
 networks:
