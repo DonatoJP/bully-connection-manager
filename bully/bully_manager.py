@@ -18,7 +18,8 @@ class BullyManager(Thread):
         bully_port = self.port_n
         
         bully_cm = ConnectionsManager(self.node_id, bully_port, self.peer_hostnames)
-        bully_peers = list(map(lambda x: x.split(':')[0].split('-')[1], self.peer_hostnames))
+        pre_bully_peers = list(filter(lambda x: not x.startswith(f'{self.node_id}-'), self.peer_hostnames))
+        bully_peers = list(map(lambda x: x.split(':')[0].split('-')[1], pre_bully_peers))
 
         self.bully_cv.acquire()
         self.bully = Bully(bully_cm, bully_peers)
@@ -54,3 +55,7 @@ class BullyManager(Thread):
     def get_is_leader(self):
         self._wait_until_bully_is_ready()
         self.bully.get_is_leader()
+    
+    def get_leader_addr(self):
+        self._wait_until_bully_is_ready()
+        self.bully.get_leader_addr()

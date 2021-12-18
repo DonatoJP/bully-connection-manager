@@ -85,7 +85,6 @@ def main():
         ',') if not addr.startswith(f"{node_id}-")]
     vault_port = os.environ['VAULT_LISTEN_PORT']
     vault_timeout = int(os.environ['VAULT_TIMEOUT'])
-    print("vault_peers", vault_peers)
     vault_cm = ConnectionsManager(
         node_id, vault_port, vault_peers, vault_timeout)
 
@@ -105,7 +104,6 @@ def main():
 
     logging.info("Waiting for initialization...")
 
-    time.sleep(5)
     logging.info("Initialization finished!")
 
     storage_path = os.environ['STORAGE_PATH']
@@ -157,8 +155,8 @@ def main():
             exited = follower_start(vault, leader_addr)
             logging.info(f"Follower finished: {exited}")
 
-    for thread in bully.threads:
-        thread.join()
+    # for thread in bully.threads:
+    #     thread.join()
 
     vault_cm._join_listen_thread()
-    bully_cm._join_listen_thread()
+    bully._join_listen_thread()
