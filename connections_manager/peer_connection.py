@@ -1,5 +1,4 @@
-import socket
-import select
+import socket, select, logging
 from .conn_errors import PeerDownError, ConnectionClosed
 from threading import Condition, Lock
 
@@ -41,7 +40,7 @@ class PeerConnection:
             self.peer_conn.close()
 
         self.peer_conn = conn
-        print(f'Setting new connection: {conn}')
+        logging.info(f'Setting new connection: {conn}')
         self.peer_conn_cv.notify_all()
         self.peer_conn_cv.release()
 
@@ -65,10 +64,10 @@ class PeerConnection:
         try:
             conn.connect(peer_host)
             self.set_connection(conn)
-            print(
+            logging.info(
                 f'[Main Thread] Connection to {peer_host} successfully done!')
         except ConnectionRefusedError as e:
-            print(
+            logging.info(
                 f'[Main Thread] Could not connect to {peer_host}. It is not yet active...')
 
     def recv_message(self):

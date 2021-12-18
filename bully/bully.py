@@ -2,12 +2,11 @@ from typing import Callable
 from connections_manager import ConnectionsManager
 from .events_enum import Event
 from threading import Thread, Condition, Lock
-import time
-
+import time, logging
 class Bully:
     def __init__(self, 
         connection_manager: ConnectionsManager,
-        peer_hostnames: "list[str]" 
+        peer_hostnames: "list[str]"
     ) -> None:
         self.conn_manager = connection_manager
         self.peer_hostnames = peer_hostnames
@@ -59,7 +58,7 @@ class Bully:
 
                 received_ping_echo = self.wait_get_received_ping_echo(3)
                 if not received_ping_echo:
-                    print(f'I detect that LEADER is down. Beggining with election process...')
+                    logging.debug(f'I detect that LEADER is down. Beggining with election process...')
                     self.begin_election_process()
             else: 
                 self.is_leader_cv.release()
@@ -191,7 +190,7 @@ class Bully:
         """
             Private function. Proclaims the node as the leader in the cluster.
         """
-        print('I am the new LEADER !')
+        logging.info('I am the new LEADER !')
         self.conn_manager.send_to_all('LEADER')
         self.set_is_leader(True)
         self.set_leader_addr(None)
@@ -205,7 +204,7 @@ class Bully:
         """
             Process message of type ELECTION. It sends "Ok" to the sender and starts new election process
         """
-        print(f'Received ELECTION message from {peer_addr}')
+        logging.info(f'Received ELECTION message from {peer_addr}')
         
         # Responder con OK y comenzar proceso de eleccion
         self.conn_manager.send_to(peer_addr, 'OK')
@@ -215,18 +214,18 @@ class Bully:
         """
             Process message of type OK. It notify the reception of the OK message to other threads
         """
-        print(f'Received OK message from {peer_addr}')
+        logging.info(f'Received OK message from {peer_addr}')
         self.notify_set_received_ok(True)
 
     def _process_leader_message(self, peer_addr):
         """
             Process message of type LEADER. Configures new leader address. Executes callback NEW_LEADER, if set.
         """
-        print(f'Received LEADER message from {peer_addr}')
+        logging.info(f'Received LEADER message from {peer_addr}')
         self.set_leader_addr(peer_addr)
         self.set_is_leader(False)
 
-        print(f'My new LEADER is now {peer_addr} !!')
+        logging.debug(f'My new LEADER is now {peer_addr} !!')
         self._reset_election_variables()
 
         if Event.NEW_LEADER in self.callbacks:
@@ -243,13 +242,13 @@ class Bully:
         self.conn_manager.send_to(peer_addr, 'ECHO_PING')
 
     def _start_receiving_from_peer(self, peer_addr):
-        print(f'Starting to receive from {peer_addr}')
+        logging.info(f'Starting to receive from {peer_addr}')
         while True:
             msg = self.conn_manager.recv_from(peer_addr)
             if msg is None:
-                print(f'Waiting until {peer_addr} is back again')
+                logging.info(f'Waiting until {peer_addr} is back again')
                 self.conn_manager.wait_until_back_again(peer_addr)
-                print(f'{peer_addr} is back again. The show must go on!')
+                logging.info(f'{peer_addr} is back again. The show must go on!')
                 continue
             elif msg == 'ELECTION':
                 self._process_election_message(peer_addr)

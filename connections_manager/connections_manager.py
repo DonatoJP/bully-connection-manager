@@ -1,4 +1,4 @@
-import socket
+import socket, logging
 from threading import Thread
 from .peer_connection import PeerConnection
 from typing import Optional
@@ -41,7 +41,7 @@ class ConnectionsManager:
         stream.bind(('0.0.0.0', self.port_n))
         stream.listen()
         self.listener_stream = stream
-        print(f'[Node {self.node_id} Listener Thread] Begin listening in {self.port_n}')
+        logging.info(f'[Node {self.node_id} Listener Thread] Begin listening in {self.port_n}')
         while True:
             conn, client_addr = stream.accept()
             peer_connection = self._find_peer(client_addr[0])
@@ -49,7 +49,7 @@ class ConnectionsManager:
                 conn.close()
                 continue
 
-            print(
+            logging.info(
                 f'[Node {self.node_id} Listener Thread] Incoming connection request from {socket.gethostbyaddr(client_addr[0])[0].split(".")[0]}')
             peer_connection.set_connection(conn)
 
