@@ -6,13 +6,11 @@ import time
 import logging
 
 
-
-
 class Bully:
-    def __init__(self, 
-        connection_manager: ConnectionsManager,
-        peer_hostnames: "list[str]" 
-    ) -> None:
+    def __init__(self,
+                 connection_manager: ConnectionsManager,
+                 peer_hostnames: "list[str]"
+                 ) -> None:
         self.conn_manager = connection_manager
         self.peer_hostnames = peer_hostnames
         self.threads = []
@@ -23,7 +21,7 @@ class Bully:
 
         self.received_ok = False
         self.received_ok_cv = Condition(Lock())
-        
+
         self.received_ping_echo = False
         self.received_ping_echo_cv = Condition(Lock())
 
@@ -38,7 +36,7 @@ class Bully:
             th.daemon = True
             th.start()
             self.threads.append(th)
-        
+
         ping_thread = Thread(target=self._poll_leader)
         ping_thread.daemon = True
         ping_thread.start()
@@ -57,19 +55,20 @@ class Bully:
             if not self.is_leader and not self.is_in_election and self.leader_addr is not None:
                 self.is_leader_cv.release()
                 self.is_in_election_cv.release()
-                
+
                 self.conn_manager.send_to(self.leader_addr, 'PING')
                 self.leader_addr_cv.release()
 
                 received_ping_echo = self.wait_get_received_ping_echo(3)
                 if not received_ping_echo:
-                    logging.info(f'I detect that LEADER is down. Beggining with election process...')
+                    logging.info(
+                        f'I detect that LEADER is down. Beggining with election process...')
                     self.begin_election_process()
-            else: 
+            else:
                 self.is_leader_cv.release()
                 self.is_in_election_cv.release()
                 self.leader_addr_cv.release()
-            
+
             self.set_received_ping_echo(False)
             time.sleep(5)
 
@@ -117,7 +116,7 @@ class Bully:
         received_ok = self.received_ok
         self.received_ok_cv.release()
         return received_ok
-    
+
     def wait_get_received_ok(self, timeout):
         """
             Executes wait on received_ok condvar for 'timeout' seconds. Then, it returns the value of
@@ -153,7 +152,7 @@ class Bully:
         received_ping_echo = self.received_ping_echo
         self.received_ping_echo_cv.release()
         return received_ping_echo
-    
+
     def notify_set_received_ping_echo(self, value):
         """
             Set a new value for received_ping_echo and notifies all threads waiting for a change on it.
@@ -162,13 +161,13 @@ class Bully:
         self.received_ping_echo = value
         self.received_ping_echo_cv.notify_all()
         self.received_ping_echo_cv.release()
-    
+
     def get_received_ping_echo(self):
         self.received_ping_echo_cv.acquire()
         received_ping_echo = self.received_ping_echo
         self.received_ping_echo_cv.release()
         return received_ping_echo
-    
+
     def set_received_ping_echo(self, value):
         self.received_ping_echo_cv.acquire()
         self.received_ping_echo = value
@@ -179,18 +178,19 @@ class Bully:
             Begins with the leader election process. It may execute the ELECTION_STARTED callback,
             if it is set
         """
-        if self.get_is_in_election(): return
+        if self.get_is_in_election():
+            return
         self.set_is_in_election(True)
 
         if Event.ELECTION_STARTED in self.callbacks:
             self.callbacks[Event.ELECTION_STARTED]()
 
         self.conn_manager.send_to_higher('ELECTION')
-        received_ok = self.wait_get_received_ok(5) # TODO: Timeout as env var
+        received_ok = self.wait_get_received_ok(5)  # TODO: Timeout as env var
 
         if not received_ok:
             self._proclaim_leader()
-    
+
     def _proclaim_leader(self):
         """
             Private function. Proclaims the node as the leader in the cluster.
@@ -210,7 +210,7 @@ class Bully:
             Process message of type ELECTION. It sends "Ok" to the sender and starts new election process
         """
         logging.info(f'Received ELECTION message from {peer_addr}')
-        
+
         # Responder con OK y comenzar proceso de eleccion
         self.conn_manager.send_to(peer_addr, 'OK')
         self.begin_election_process()
@@ -239,7 +239,7 @@ class Bully:
     def _reset_election_variables(self):
         self.set_is_in_election(False)
         self.set_received_ok(False)
-    
+
     def _echo_ping(self, peer_addr):
         """
             Process message of type PING. Answers with ECHO_PING
@@ -250,7 +250,13 @@ class Bully:
         logging.info(f'Starting to receive from {peer_addr}')
         while True:
             msg = self.conn_manager.recv_from(peer_addr)
-            if msg == 'ELECTION':
+            if msg is None:
+                logging.info(f'Waiting until {peer_addr} is back again')
+                self.conn_manager.wait_until_back_again(peer_addr)
+                logging.info(
+                    f'{peer_addr} is back again. The show must go on!')
+                continue
+            elif msg == 'ELECTION':
                 self._process_election_message(peer_addr)
             elif msg == 'OK':
                 self._process_ok_message(peer_addr)
@@ -270,6 +276,3 @@ class Bully:
             Event.LEADER_DOWN
         """
         self.callbacks[event] = callback
-
-
-        
