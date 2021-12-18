@@ -1,4 +1,6 @@
 from multiprocessing import process
+from bully import Bully, Event
+from bully.bully_manager import BullyManager
 from connections_manager import ConnectionsManager
 import os
 import signal
@@ -28,27 +30,20 @@ def main():
     node_id = os.environ['NODE_ID']
     configure_logger()
 
-    logging.info(
-        f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
-    cm = ConnectionsManager(node_id, port_n, peer_addrs)
-
+    logging.info(f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
+    bully = BullyManager(node_id, peer_addrs, port_n)
+    bully.start()
     def __exit_gracefully(*args):
         print("Received SIGTERM signal. Starting graceful exit...")
-        cm.shutdown_connections()
+        bully.shutdown_connections()
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, __exit_gracefully)
 
-    time.sleep(5)
-    cm.send_to_all(f'Hola 1 desde {port_n} !!')
-    cm.send_to_all(f'Hola 2 desde {port_n} !!')
-    for peer in peer_addrs:
-        peer_addr = peer.split(':')[0].split('-')[1]
-        received = cm.recv_from(peer_addr)
-        print(f'Received from {peer_addr}: {received}')
-        received = cm.recv_from(peer_addr)
-        print(f'Received from {peer_addr}: {received}')
-    cm._join_listen_thread()
+    bully.set_callback(Event.NEW_LEADER, new_leader_callback)
+    bully.set_callback(Event.ELECTION_STARTED, election_callback)
+
+    bully._join_listen_thread()
 
 
 if __name__ == '__main__':
