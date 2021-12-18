@@ -25,7 +25,6 @@ def main():
     logging.info(f'Starting node {node_id} with LISTEN_PORT={port_n} and PEERS_INFO={peer_addrs}')
     bully = BullyManager(node_id, peer_addrs, port_n)
     bully.start()
-
     def __exit_gracefully(*args):
         print("Received SIGTERM signal. Starting graceful exit...")
         bully.shutdown_connections()
@@ -33,12 +32,12 @@ def main():
 
     signal.signal(signal.SIGTERM, __exit_gracefully)
 
-    bully.set_callback(Event.NEW_LEADER, new_leader_callback)
-    bully.set_callback(Event.ELECTION_STARTED, election_callback)
+    # bully.set_callback(Event.NEW_LEADER, new_leader_callback)
+    # bully.set_callback(Event.ELECTION_STARTED, election_callback)
 
-    bully.begin_election_process()
+    # bully.begin_election_process()
 
-    bully._join_listen_thread()
+    # bully._join_listen_thread()
 
 
 if __name__ == '__main__':

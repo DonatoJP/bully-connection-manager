@@ -31,6 +31,9 @@ class PeerConnection:
 
     def is_higher(self, peer_id: int):
         return self.node_id > peer_id
+    
+    def is_connected(self):
+        return self.peer_conn != None
 
     def set_connection(self, conn):
         self.peer_conn_cv.acquire()
@@ -66,9 +69,11 @@ class PeerConnection:
             self.set_connection(conn)
             logging.info(
                 f'[Main Thread] Connection to {peer_host} successfully done!')
+            return True
         except ConnectionRefusedError as e:
             logging.info(
                 f'[Main Thread] Could not connect to {peer_host}. It is not yet active...')
+            return False
 
     def recv_message(self):
 

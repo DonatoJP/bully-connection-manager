@@ -12,6 +12,9 @@ class Bully:
         self.peer_hostnames = peer_hostnames
         self.threads = []
         self.callbacks = {}
+        self.ready_peers = 0
+        self.bully_is_ready = False
+        self.bully_is_ready_cv = Condition(Lock())
 
         self.is_in_election = False
         self.is_in_election_cv = Condition(Lock())
@@ -38,6 +41,16 @@ class Bully:
         ping_thread.daemon = True
         ping_thread.start()
         self.threads.append(ping_thread)
+
+        self._wait_until_all_are_ready()
+
+    def _wait_until_all_are_ready(self):
+        self.conn_manager.send_to_all('READY')
+
+        self.bully_is_ready_cv.acquire()
+        self.bully_is_ready_cv.wait_for(lambda: self.bully_is_ready)
+        self.bully_is_ready_cv.release()
+
 
     def _poll_leader(self):
         """
@@ -260,6 +273,29 @@ class Bully:
                 self._echo_ping(peer_addr)
             elif msg == 'ECHO_PING':
                 self.notify_set_received_ping_echo(True)
+            elif msg == 'READY':
+                self._process_ready_message(peer_addr)
+            elif msg == 'ECHO_READY':
+                self._process_echo_ready_message()
+    
+    def _process_ready_message(self, peer_addr):
+        self.bully_is_ready_cv.acquire()
+        if self.bully_is_ready:
+            self.conn_manager.send_to(peer_addr, 'ECHO_READY')
+            self.bully_is_ready_cv.release()
+        else:
+            self.ready_peers += 1
+            if self.ready_peers == len(self.conn_manager.connections):
+                self.bully_is_ready = True
+                self.bully_is_ready_cv.notify_all()
+            self.bully_is_ready_cv.release()
+    
+    def _process_echo_ready_message(self):
+        self.bully_is_ready_cv.acquire()
+        self.bully_is_ready = True
+        self.bully_is_ready_cv.notify_all()
+        self.bully_is_ready_cv.release()
+
 
     def set_callback(self, event: Event, callback: Callable):
         """
