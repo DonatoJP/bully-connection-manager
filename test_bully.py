@@ -32,12 +32,10 @@ def main():
 
     signal.signal(signal.SIGTERM, __exit_gracefully)
 
-    # bully.set_callback(Event.NEW_LEADER, new_leader_callback)
-    # bully.set_callback(Event.ELECTION_STARTED, election_callback)
+    bully.set_callback(Event.NEW_LEADER, new_leader_callback)
+    bully.set_callback(Event.ELECTION_STARTED, election_callback)
 
-    # bully.begin_election_process()
-
-    # bully._join_listen_thread()
+    bully._join_listen_thread()
 
 
 if __name__ == '__main__':

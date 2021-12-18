@@ -44,12 +44,15 @@ class Bully:
 
         self._wait_until_all_are_ready()
 
-    def _wait_until_all_are_ready(self):
-        self.conn_manager.send_to_all('READY')
-
+    def wait_bully_ready(self):
         self.bully_is_ready_cv.acquire()
         self.bully_is_ready_cv.wait_for(lambda: self.bully_is_ready)
         self.bully_is_ready_cv.release()
+
+    def _wait_until_all_are_ready(self):
+        self.conn_manager.send_to_all('READY')
+
+        self.wait_bully_ready()
 
 
     def _poll_leader(self):
